@@ -1,0 +1,23 @@
+{
+  "name": "@allama/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "allama": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx src/index.tsx"
+  },
+  "dependencies": {
+    "@allama/core": "workspace:*",
+    "@allama/protocol": "workspace:*",
+    "commander": "15.0.0",
+    "fastify": "5.12.1",
+    "ink": "7.1.1",
+    "react": "19.2.8",
+    "zod": "4.4.3"
+  }
+}
