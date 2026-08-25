@@ -31,7 +31,7 @@ export function Dashboard({ store, taskId }: DashboardProps) {
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
       <Text bold color="cyan">
-        allama — 報連相できる開発秘書
+        allama — AI作業の実行状況
       </Text>
       <Text>
         Task: {task.id} / Status: <Text color="yellow">{task.status}</Text>
