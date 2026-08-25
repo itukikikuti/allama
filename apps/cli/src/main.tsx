@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createInterface } from 'node:readline/promises';
+import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { stdin, stdout } from 'node:process';
 
@@ -11,6 +12,7 @@ import {
   AllamaConfigSchema,
   GitWorkspaceManager,
   configPath,
+  isSafeGitInitPath,
   saveConfig,
   type Task,
   type WorkItem,
@@ -83,24 +85,56 @@ function printAgenda(runtime: Runtime): void {
   printWorkItems('AIが対応すること', runtime.store.listOpenWorkItems('ai'));
 }
 
+function queueLocation(runtime: Runtime, task: Task): WorkItem {
+  const existing = runtime.store.findOpenWorkItemForTask(task.id, 'user');
+  if (existing) return existing;
+  const aiItem = runtime.store.findOpenWorkItemForTask(task.id, 'ai');
+  return runtime.store.createWorkItem({
+    owner: 'user',
+    kind: 'location',
+    title: `制作先フォルダを指定してください: ${task.contract?.goal ?? task.prompt}`,
+    details: `現在の作業場所は ${task.repositoryPath} です。ホームやドライブ直下は保護されているため、専用プロジェクトフォルダの絶対パスを回答してください。存在しない場合は回答後に作成します。`,
+    priority: aiItem?.priority ?? 'normal',
+    dueAt: aiItem?.dueAt ?? null,
+    repositoryPath: task.repositoryPath,
+    taskId: task.id,
+  });
+}
+
 function queueDecision(runtime: Runtime, task: Task): WorkItem {
   const existing = runtime.store.findOpenWorkItemForTask(task.id, 'user');
   if (existing) return existing;
   const aiItem = runtime.store.findOpenWorkItemForTask(task.id, 'ai');
-  const approval = task.status === 'awaiting_approval';
   const decisionData = runtime.store.lastDecisionData(task.id);
-  const details = approval
-    ? JSON.stringify(task.contract, null, 2)
-    : [task.summary ?? 'AIから確認事項があります。', JSON.stringify(decisionData ?? {}, null, 2)]
-        .filter(Boolean)
-        .join('\n\n');
+  const reason = typeof decisionData?.reason === 'string' ? decisionData.reason : 'scope';
+  const approvalReasons = new Set([
+    'non_git',
+    'secret',
+    'destructive',
+    'dependency',
+    'network',
+    'external_write',
+  ]);
+  const titles: Record<string, string> = {
+    non_git: '制作先フォルダをGit管理にすることを承認してください',
+    secret: '機密情報をAIへ渡してよいか判断してください',
+    destructive: '削除・上書き操作を承認してください',
+    dependency: '依存パッケージの追加・変更を承認してください',
+    network: 'ネットワークアクセスを承認してください',
+    external_write: '外部サービスへの書き込みを承認してください',
+    scope: '作業範囲の変更について回答してください',
+    incomplete_tool: '中断された操作の扱いを判断してください',
+  };
   return runtime.store.createWorkItem({
     owner: 'user',
-    kind: approval ? 'approval' : 'question',
-    title: approval
-      ? `作業契約を確認: ${task.contract?.goal ?? task.prompt}`
-      : `AIからの確認: ${task.summary ?? task.prompt}`,
-    details,
+    kind: approvalReasons.has(reason) ? 'approval' : 'question',
+    title: titles[reason] ?? 'AIからの質問に回答してください',
+    details: [
+      task.summary ?? 'AIから確認事項があります。',
+      JSON.stringify(decisionData ?? {}, null, 2),
+    ]
+      .filter(Boolean)
+      .join('\n\n'),
     priority: aiItem?.priority ?? 'normal',
     dueAt: aiItem?.dueAt ?? null,
     repositoryPath: task.repositoryPath,
@@ -114,7 +148,7 @@ function syncQueuedTask(runtime: Runtime, taskId: string): Task {
   if (aiItem) {
     if (task.status === 'completed') runtime.store.setWorkItemStatus(aiItem.id, 'done');
     else if (task.status === 'cancelled') runtime.store.setWorkItemStatus(aiItem.id, 'cancelled');
-    else if (task.status === 'awaiting_approval' || task.status === 'awaiting_decision') {
+    else if (task.status === 'awaiting_decision') {
       runtime.store.setWorkItemStatus(aiItem.id, 'waiting');
       queueDecision(runtime, task);
     } else if (task.status === 'failed') {
@@ -144,7 +178,28 @@ async function planWorkItem(runtime: Runtime, item: WorkItem): Promise<Task> {
   try {
     const task = await runtime.engine.plan(item.title, item.repositoryPath ?? process.cwd());
     runtime.store.linkWorkItem(item.id, task.id);
-    return syncQueuedTask(runtime, task.id);
+    if (
+      task.status === 'awaiting_approval' &&
+      task.contract?.mutating === true &&
+      !isSafeGitInitPath(task.repositoryPath)
+    ) {
+      runtime.store.setWorkItemStatus(item.id, 'waiting');
+      queueLocation(runtime, task);
+      return task;
+    }
+    let current = task;
+    if (current.status === 'awaiting_approval') {
+      current = await runtime.engine.decide(current.id, true);
+    }
+    if (current.status === 'executing' || current.status === 'verifying') {
+      try {
+        await executeWithProgress(runtime, current.id, false);
+      } catch (error) {
+        const latest = runtime.store.getTask(current.id);
+        if (latest.status !== 'awaiting_decision') throw error;
+      }
+    }
+    return syncQueuedTask(runtime, current.id);
   } catch (error) {
     runtime.store.setWorkItemStatus(item.id, 'open');
     throw error;
@@ -303,8 +358,12 @@ program
       });
       stdout.write(`AIのタスクリストへ追加しました: ${item.id}\n`);
       if (options.plan) {
-        await planWorkItem(runtime, item);
-        stdout.write('AIが依頼を整理し、必要な確認をあなたのタスクリストへ追加しました。\n');
+        const task = await planWorkItem(runtime, item);
+        stdout.write(
+          task.status === 'completed'
+            ? 'AIが依頼を完了しました。\n'
+            : 'AIが作業を進め、必要な判断だけをあなたのタスクリストへ追加しました。\n',
+        );
       }
       printAgenda(runtime);
     },
@@ -361,6 +420,26 @@ program
     const item = runtime.store.getWorkItem(id);
     const message = answer.join(' ');
     if (item.owner !== 'user') throw new Error('あなた担当のタスクだけに回答できます。');
+    if (item.kind === 'location') {
+      if (!item.taskId) throw new Error('作業場所の質問にAI実行タスクがリンクされていません。');
+      if (!message) throw new Error('作成先の絶対パスを回答してください。');
+      const projectPath = resolve(message);
+      if (!isSafeGitInitPath(projectPath)) {
+        throw new Error(
+          'ホームやドライブ直下は指定できません。専用のプロジェクトフォルダを指定してください。',
+        );
+      }
+      const aiItem = runtime.store.findOpenWorkItemForTask(item.taskId, 'ai');
+      if (!aiItem) throw new Error('元のAIタスクが見つかりません。');
+      await mkdir(projectPath, { recursive: true });
+      runtime.engine.cancel(item.taskId);
+      runtime.store.answerWorkItem(id, projectPath);
+      const requeued = runtime.store.requeueWorkItem(aiItem.id, projectPath);
+      await planWorkItem(runtime, requeued);
+      stdout.write(`作業場所を${projectPath}へ設定し、AIが作業を再開しました。\n`);
+      printAgenda(runtime);
+      return;
+    }
     if (item.kind === 'action' || !item.taskId) {
       runtime.store.answerWorkItem(id, message);
       printAgenda(runtime);

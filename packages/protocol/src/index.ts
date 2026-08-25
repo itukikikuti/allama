@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const ALLAMA_VERSION = '0.2.0';
+export const ALLAMA_VERSION = '0.2.1';
 
 export const TaskStatusSchema = z.enum([
   'contract_proposed',
@@ -41,7 +41,7 @@ export const TaskSchema = z.object({
 export type Task = z.infer<typeof TaskSchema>;
 
 export const WorkOwnerSchema = z.enum(['user', 'ai']);
-export const WorkKindSchema = z.enum(['request', 'approval', 'question', 'action']);
+export const WorkKindSchema = z.enum(['request', 'approval', 'question', 'location', 'action']);
 export const WorkStatusSchema = z.enum(['open', 'in_progress', 'waiting', 'done', 'cancelled']);
 export const WorkPrioritySchema = z.enum(['urgent', 'high', 'normal', 'low']);
 export type WorkOwner = z.infer<typeof WorkOwnerSchema>;

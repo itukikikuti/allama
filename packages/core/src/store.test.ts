@@ -110,4 +110,21 @@ describe('TaskStore', () => {
       completedAt: expect.any(String),
     });
   });
+
+  it('can requeue an AI item at a user-selected project location', () => {
+    const tasks = store();
+    const task = tasks.createTask('Build an app', 'C:\\Users\\person');
+    const item = tasks.createWorkItem({
+      title: 'Build an app',
+      repositoryPath: 'C:\\Users\\person',
+    });
+    tasks.linkWorkItem(item.id, task.id);
+    tasks.setWorkItemStatus(item.id, 'waiting');
+
+    expect(tasks.requeueWorkItem(item.id, 'C:\\projects\\app')).toMatchObject({
+      repositoryPath: 'C:\\projects\\app',
+      taskId: null,
+      status: 'open',
+    });
+  });
 });

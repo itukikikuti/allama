@@ -202,6 +202,19 @@ export class TaskStore {
     return this.getWorkItem(id);
   }
 
+  public requeueWorkItem(id: string, repositoryPath: string): WorkItem {
+    const item = this.getWorkItem(id);
+    if (item.owner !== 'ai') throw new Error('Only AI work items can be requeued.');
+    this.database
+      .prepare(
+        `UPDATE work_items
+         SET repository_path = ?, task_id = NULL, status = 'open', updated_at = ?, completed_at = NULL
+         WHERE id = ?`,
+      )
+      .run(repositoryPath, now(), id);
+    return this.getWorkItem(id);
+  }
+
   public setWorkItemStatus(id: string, status: WorkStatus): WorkItem {
     const parsed = WorkStatusSchema.parse(status);
     const timestamp = now();
