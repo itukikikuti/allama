@@ -73,7 +73,21 @@ async function executeWithProgress(runtime: Runtime, taskId: string, json: boole
 async function settleDecision(runtime: Runtime, task: Task, yes: boolean): Promise<Task> {
   let current = task;
   if (current.status === 'awaiting_decision') {
-    const approved = await confirm(`タスク${current.id}の相談事項を承認して続けますか？`, yes);
+    const reason = runtime.store.lastDecisionReason(current.id);
+    const data = runtime.store.lastDecisionData(current.id);
+    if (reason === 'non_git' && data?.canInitialize !== true) {
+      stdout.write(
+        `\nこの場所では変更作業を開始できません。次のように専用フォルダを作成して再実行してください。\n\n` +
+          `  mkdir <project-name>\n  cd <project-name>\n  allama\n\n` +
+          `タスクID: ${current.id}（台帳には相談待ちとして保存されています）\n`,
+      );
+      return current;
+    }
+    const question =
+      reason === 'non_git'
+        ? `${current.repositoryPath}をGitリポジトリとして初期化し、作業を続けますか？`
+        : `タスク${current.id}の相談事項を承認して続けますか？`;
+    const approved = await confirm(question, yes);
     current = await runtime.engine.decide(current.id, approved);
   }
   if (current.status === 'awaiting_approval') {
@@ -86,6 +100,27 @@ async function settleDecision(runtime: Runtime, task: Task, yes: boolean): Promi
   return current;
 }
 
+async function runUntilPaused(
+  runtime: Runtime,
+  task: Task,
+  options: { yes: boolean; json: boolean },
+): Promise<void> {
+  let current = task;
+  while (current.status === 'executing' || current.status === 'verifying') {
+    try {
+      await executeWithProgress(runtime, current.id, options.json);
+      return;
+    } catch (error) {
+      current = runtime.store.getTask(current.id);
+      if (current.status !== 'awaiting_decision') throw error;
+      current = await settleDecision(runtime, current, options.yes);
+    }
+  }
+  if (current.status !== 'completed') {
+    stdout.write(`${JSON.stringify({ task: current }, null, 2)}\n`);
+  }
+}
+
 async function runNewTask(
   prompt: string,
   options: { cwd: string; yes: boolean; json: boolean },
@@ -93,7 +128,7 @@ async function runNewTask(
   const runtime = await createRuntime();
   let task = await runtime.engine.plan(prompt, options.cwd);
   task = await settleDecision(runtime, task, options.yes);
-  if (task.status === 'executing') await executeWithProgress(runtime, task.id, options.json);
+  if (task.status === 'executing') await runUntilPaused(runtime, task, options);
   else stdout.write(`${JSON.stringify({ task }, null, 2)}\n`);
 }
 
@@ -105,6 +140,10 @@ async function resumeTask(
   if (options.message) runtime.store.addUserMessage(taskId, options.message);
   let task = runtime.store.getTask(taskId);
   task = await settleDecision(runtime, task, options.yes);
+  if (task.status === 'awaiting_decision' || task.status === 'cancelled') {
+    stdout.write(`${JSON.stringify({ task }, null, 2)}\n`);
+    return;
+  }
   if (task.status === 'failed') {
     if (!(await confirm('失敗状態から再試行しますか？', options.yes))) return;
     task = runtime.store.setStatus(task.id, 'executing', 'ユーザーの指示で再試行します。');
@@ -112,7 +151,7 @@ async function resumeTask(
   if (task.status !== 'executing' && task.status !== 'verifying') {
     throw new Error(`Task ${task.id} cannot be resumed from ${task.status}.`);
   }
-  await executeWithProgress(runtime, task.id, options.json);
+  await runUntilPaused(runtime, task, options);
 }
 
 async function interactive(): Promise<void> {
@@ -280,4 +319,9 @@ program
     );
   });
 
-await program.parseAsync();
+try {
+  await program.parseAsync();
+} catch (error) {
+  process.stderr.write(`allama: ${error instanceof Error ? error.message : String(error)}\n`);
+  process.exitCode = 1;
+}

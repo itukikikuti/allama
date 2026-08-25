@@ -1,12 +1,12 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { homedir, tmpdir } from 'node:os';
+import { join, parse, resolve } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
 import type { Task } from '@allama/protocol';
 
-import { GitWorkspaceManager } from './git.js';
+import { GitWorkspaceManager, isSafeGitInitPath } from './git.js';
 import { runProcess } from './process.js';
 
 const temporaryDirectories: string[] = [];
@@ -18,6 +18,26 @@ afterEach(async () => {
 });
 
 describe('GitWorkspaceManager', () => {
+  it('initializes an approved project directory with a usable base commit', async () => {
+    const base = await mkdtemp(join(tmpdir(), 'allama-init-'));
+    temporaryDirectories.push(base);
+    const repository = join(base, 'new-project');
+    await mkdir(repository);
+    const manager = new GitWorkspaceManager(join(base, 'worktrees'));
+
+    await manager.initialize(repository);
+
+    await expect(manager.inspect(repository)).resolves.toMatchObject({ branch: 'main' });
+    const log = await runProcess('git', ['log', '--format=%s'], { cwd: repository });
+    expect(log.stdout.trim()).toBe('chore: initialize repository');
+  });
+
+  it('does not permit Git initialization at a home or filesystem root', () => {
+    expect(isSafeGitInitPath(homedir())).toBe(false);
+    expect(isSafeGitInitPath(parse(resolve(homedir())).root)).toBe(false);
+    expect(isSafeGitInitPath(join(homedir(), 'allama-project'))).toBe(true);
+  });
+
   it('isolates changes and commits only after validation', async () => {
     const base = await mkdtemp(join(tmpdir(), 'allama-git-'));
     temporaryDirectories.push(base);

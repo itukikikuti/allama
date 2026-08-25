@@ -67,7 +67,14 @@ export class AllamaEngine {
     if (task.status !== 'awaiting_decision') {
       throw new Error(`Task ${taskId} is not awaiting a decision.`);
     }
-    if (this.store.lastDecisionReason(taskId) === 'secret') {
+    const decisionReason = this.store.lastDecisionReason(taskId);
+    if (decisionReason === 'non_git') {
+      const data = this.store.lastDecisionData(taskId);
+      if (data?.canInitialize !== true) return task;
+      await this.git.initialize(task.repositoryPath);
+      this.store.appendEvent(task.id, 'progress', 'Gitリポジトリを初期化しました。');
+    }
+    if (decisionReason === 'secret') {
       const data = this.store.lastDecisionData(taskId);
       const findings = Array.isArray(data?.findings) ? data.findings : [];
       const fingerprints = findings.flatMap((finding) => {

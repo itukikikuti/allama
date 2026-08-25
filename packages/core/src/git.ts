@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import { homedir } from 'node:os';
+import { basename, dirname, join, parse, resolve } from 'node:path';
 
 import type { Contract, Task } from '@allama/protocol';
 
@@ -30,6 +31,11 @@ function slug(value: string): string {
   );
 }
 
+export function isSafeGitInitPath(repositoryPath: string): boolean {
+  const target = resolve(repositoryPath);
+  return target !== resolve(homedir()) && target !== parse(target).root;
+}
+
 export interface WorkspaceInfo {
   repositoryRoot: string;
   worktreePath: string;
@@ -43,16 +49,44 @@ export class GitWorkspaceManager {
   public async inspect(repositoryPath: string): Promise<{ root: string; branch: string }> {
     const rootResult = await git(repositoryPath, ['rev-parse', '--show-toplevel']);
     if (rootResult.exitCode !== 0) {
+      const canInitialize = isSafeGitInitPath(repositoryPath);
       throw new DecisionRequiredError(
-        '変更タスクにはGitリポジトリが必要です。`git init`の可否を確認してください。',
+        canInitialize
+          ? '変更タスクにはGitリポジトリが必要です。`git init`の可否を確認してください。'
+          : 'ユーザーホームやドライブ直下ではGitを初期化できません。専用のプロジェクトフォルダを作成し、そこでAllamaを再実行してください。',
         'non_git',
-        { repositoryPath },
+        { repositoryPath, canInitialize },
       );
     }
     const repositoryRoot = resolve(expectSuccess(rootResult, 'git rev-parse'));
     const branchResult = await git(repositoryRoot, ['branch', '--show-current']);
     const branch = expectSuccess(branchResult, 'git branch') || 'HEAD';
     return { root: repositoryRoot, branch };
+  }
+
+  public async initialize(repositoryPath: string): Promise<void> {
+    const target = resolve(repositoryPath);
+    if (!isSafeGitInitPath(target)) {
+      throw new DecisionRequiredError(
+        'ユーザーホームやドライブ直下ではGitを初期化できません。専用のプロジェクトフォルダを使用してください。',
+        'non_git',
+        { repositoryPath: target, canInitialize: false },
+      );
+    }
+    expectSuccess(await git(target, ['init', '-b', 'main']), 'git init');
+    expectSuccess(
+      await git(target, [
+        '-c',
+        'user.name=Allama',
+        '-c',
+        'user.email=allama@local',
+        'commit',
+        '--allow-empty',
+        '-m',
+        'chore: initialize repository',
+      ]),
+      'git initial commit',
+    );
   }
 
   public async create(task: Task): Promise<WorkspaceInfo> {
