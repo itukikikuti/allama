@@ -5,6 +5,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import type { Contract, Task } from '@allama/protocol';
 
 import { DecisionRequiredError } from './errors.js';
+import { assertSafeCommand } from './policy.js';
 import { runProcess, runPowerShell, type ProcessResult } from './process.js';
 import { worktreesRoot } from './paths.js';
 
@@ -95,6 +96,7 @@ export class GitWorkspaceManager {
     results.push(diffCheck);
     if (diffCheck.exitCode !== 0) return results;
     for (const command of contract.validationCommands) {
+      assertSafeCommand(command);
       const result = await runPowerShell(command, worktreePath);
       results.push(result);
       if (result.exitCode !== 0) break;

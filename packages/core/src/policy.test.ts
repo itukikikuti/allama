@@ -9,9 +9,12 @@ describe('execution policy', () => {
     expect(() => assertSafeCommand('git diff --check')).not.toThrow();
     for (const command of [
       'git push',
+      'git commit -m nope',
       'Remove-Item foo',
       'pnpm add left-pad',
       'curl example.com',
+      "node -e \"require('fs').writeFileSync('x', 'y')\"",
+      'Get-Content C:\\Users\\me\\.ssh\\id_rsa',
     ]) {
       expect(() => assertSafeCommand(command)).toThrow(DecisionRequiredError);
     }

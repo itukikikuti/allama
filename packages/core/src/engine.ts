@@ -45,7 +45,7 @@ export class AllamaEngine {
   public async plan(prompt: string, repositoryPath: string): Promise<Task> {
     const task = this.store.createTask(prompt, repositoryPath);
     try {
-      if (!this.store.hasCloudSecretOverride(task.id)) assertCloudSafe(prompt, '依頼文');
+      assertCloudSafe(prompt, '依頼文', this.store.allowedSecretFingerprints(task.id));
       const contract = await proposeContract(this.ollama, this.config, prompt, repositoryPath);
       return this.store.setContract(task.id, contract);
     } catch (error) {
@@ -68,7 +68,13 @@ export class AllamaEngine {
       throw new Error(`Task ${taskId} is not awaiting a decision.`);
     }
     if (this.store.lastDecisionReason(taskId) === 'secret') {
-      this.store.setCloudSecretOverride(taskId, true);
+      const data = this.store.lastDecisionData(taskId);
+      const findings = Array.isArray(data?.findings) ? data.findings : [];
+      const fingerprints = findings.flatMap((finding) => {
+        if (!finding || typeof finding !== 'object' || !('fingerprint' in finding)) return [];
+        return typeof finding.fingerprint === 'string' ? [finding.fingerprint] : [];
+      });
+      this.store.allowSecretFingerprints(taskId, fingerprints);
     }
     if (!task.contract) {
       const contract = await proposeContract(
@@ -142,6 +148,7 @@ export class AllamaEngine {
       heartbeat.unref();
 
       let summary = '';
+      let modelFinished = false;
       try {
         for (let iteration = 0; iteration < this.config.maxToolIterations; iteration += 1) {
           if (signal?.aborted) {
@@ -153,9 +160,11 @@ export class AllamaEngine {
             messages.push({ role: 'user', content: `New instruction from the user:\n${message}` });
           }
           knownUserMessages = latestUserMessages;
-          if (!this.store.hasCloudSecretOverride(task.id)) {
-            assertCloudSafe(outgoingText(messages), 'モデル入力');
-          }
+          assertCloudSafe(
+            outgoingText(messages),
+            'モデル入力',
+            this.store.allowedSecretFingerprints(task.id),
+          );
           const response = await this.ollama.chat({
             model: this.config.executorModel,
             messages,
@@ -168,7 +177,10 @@ export class AllamaEngine {
             content: response.content,
             tool_calls: response.toolCalls,
           });
-          if (response.toolCalls.length === 0) break;
+          if (response.toolCalls.length === 0) {
+            modelFinished = true;
+            break;
+          }
 
           for (const [index, call] of response.toolCalls.entries()) {
             const callId = stableCallId(iteration, index, call);
@@ -188,6 +200,11 @@ export class AllamaEngine {
         }
       } finally {
         clearInterval(heartbeat);
+      }
+      if (!modelFinished) {
+        throw new Error(
+          `モデルが${this.config.maxToolIterations}回のツール上限内に完了しませんでした。`,
+        );
       }
 
       let commit: string | null = null;

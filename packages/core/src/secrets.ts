@@ -1,10 +1,12 @@
 import { basename } from 'node:path';
+import { createHash } from 'node:crypto';
 
 import { DecisionRequiredError } from './errors.js';
 
 export interface SecretFinding {
   kind: string;
   preview: string;
+  fingerprint: string;
   line: number;
 }
 
@@ -45,6 +47,7 @@ export function scanSecrets(text: string): SecretFinding[] {
       findings.push({
         kind,
         preview: preview(match[1] ?? match[0]),
+        fingerprint: createHash('sha256').update(match[0]).digest('hex'),
         line: text.slice(0, index).split('\n').length,
       });
     }
@@ -52,8 +55,9 @@ export function scanSecrets(text: string): SecretFinding[] {
   return findings;
 }
 
-export function assertCloudSafe(text: string, source: string): void {
-  const findings = scanSecrets(text);
+export function assertCloudSafe(text: string, source: string, allowed: string[] = []): void {
+  const allowedSet = new Set(allowed);
+  const findings = scanSecrets(text).filter((finding) => !allowedSet.has(finding.fingerprint));
   if (findings.length > 0) {
     throw new DecisionRequiredError(
       `Cloud送信候補「${source}」で機密情報らしき値を検出しました。送信を停止しています。`,

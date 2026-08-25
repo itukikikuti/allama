@@ -16,5 +16,11 @@ describe('secret protection', () => {
     expect(findings).toHaveLength(1);
     expect(findings[0]?.preview).not.toContain('abcdefghijklmnopqrstuvwxyz');
     expect(() => assertCloudSafe(text, 'test')).toThrow(DecisionRequiredError);
+    expect(() => assertCloudSafe(text, 'test', [findings[0]!.fingerprint])).not.toThrow();
+    expect(() =>
+      assertCloudSafe(`${text}\ntoken = "different-secret-value-123456"`, 'test', [
+        findings[0]!.fingerprint,
+      ]),
+    ).toThrow(DecisionRequiredError);
   });
 });

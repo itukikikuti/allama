@@ -19,7 +19,7 @@ export function openDatabase(path = stateDatabasePath()): DatabaseSync {
       worktree_path TEXT,
       base_branch TEXT,
       summary TEXT,
-      cloud_secret_override INTEGER NOT NULL DEFAULT 0,
+      allowed_secret_fingerprints_json TEXT NOT NULL DEFAULT '[]',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -63,8 +63,10 @@ export function openDatabase(path = stateDatabasePath()): DatabaseSync {
   const taskColumns = database.prepare('PRAGMA table_info(tasks)').all() as Array<{
     name: string;
   }>;
-  if (!taskColumns.some((column) => column.name === 'cloud_secret_override')) {
-    database.exec('ALTER TABLE tasks ADD COLUMN cloud_secret_override INTEGER NOT NULL DEFAULT 0;');
+  if (!taskColumns.some((column) => column.name === 'allowed_secret_fingerprints_json')) {
+    database.exec(
+      "ALTER TABLE tasks ADD COLUMN allowed_secret_fingerprints_json TEXT NOT NULL DEFAULT '[]';",
+    );
   }
   return database;
 }

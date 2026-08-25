@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { openDatabase } from './database.js';
 import { TaskStore } from './store.js';
+import { allamaHome } from './paths.js';
 
 const databases: DatabaseSync[] = [];
 
@@ -18,6 +19,9 @@ function store(): TaskStore {
 }
 
 describe('TaskStore', () => {
+  it('supports an explicit application home for isolated runs', () => {
+    expect(allamaHome({ ALLAMA_HOME: 'C:\\isolated-allama' })).toBe('C:\\isolated-allama');
+  });
   it('requires a contract before approval and preserves the event trail', () => {
     const tasks = store();
     const task = tasks.createTask('Fix the bug', 'C:\\repo');
@@ -56,13 +60,13 @@ describe('TaskStore', () => {
     expect(tasks.decideMemory(memory.id, true).status).toBe('approved');
   });
 
-  it('persists additional instructions and explicit secret overrides', () => {
+  it('persists additional instructions and approved secret fingerprints', () => {
     const tasks = store();
     const task = tasks.createTask('Inspect', 'C:\\repo');
     tasks.addUserMessage(task.id, 'Do not change the public API');
     expect(tasks.listUserMessages(task.id)).toEqual(['Do not change the public API']);
-    expect(tasks.hasCloudSecretOverride(task.id)).toBe(false);
-    tasks.setCloudSecretOverride(task.id, true);
-    expect(tasks.hasCloudSecretOverride(task.id)).toBe(true);
+    expect(tasks.allowedSecretFingerprints(task.id)).toEqual([]);
+    tasks.allowSecretFingerprints(task.id, ['fingerprint-1']);
+    expect(tasks.allowedSecretFingerprints(task.id)).toEqual(['fingerprint-1']);
   });
 });

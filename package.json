@@ -15,7 +15,8 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "allama": "pnpm --filter @allama/cli dev"
+    "allama": "pnpm --filter @allama/cli dev",
+    "start": "node apps/cli/dist/index.js"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

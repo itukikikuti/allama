@@ -10,7 +10,8 @@ const BLOCKED_COMMANDS: Array<{
   message: string;
 }> = [
   {
-    pattern: /\b(?:git\s+)?(?:push|merge|rebase|reset|clean|checkout|switch|cherry-pick)\b/i,
+    pattern:
+      /\bgit\s+(?:push|merge|rebase|reset|clean|checkout|switch|cherry-pick|add|commit|tag|branch|worktree|config|remote)\b/i,
     reason: 'destructive',
     message: 'Git履歴・ブランチ・リモートを変更する操作',
   },
@@ -34,6 +35,16 @@ const BLOCKED_COMMANDS: Array<{
     reason: 'external_write',
     message: 'シェルから直接ファイルを書き込む操作',
   },
+  {
+    pattern: /\b(?:Copy-Item|Move-Item|Rename-Item|New-Item|Start-Process|cmd)(?:\.exe)?\b/i,
+    reason: 'external_write',
+    message: 'ファイル変更または別プロセスへ処理を逃がす操作',
+  },
+  {
+    pattern: /\b(?:node|python|py|ruby|perl)(?:\.exe)?\s+(?:-e|-c)\b/i,
+    reason: 'external_write',
+    message: 'インラインスクリプトによるポリシー回避の可能性がある操作',
+  },
 ];
 
 export function assertSafeCommand(command: string): void {
@@ -45,6 +56,13 @@ export function assertSafeCommand(command: string): void {
         { command },
       );
     }
+  }
+  if (/(?:^|[\s'"(])(?:[A-Za-z]:[\\/]|\\\\)/.test(command)) {
+    throw new DecisionRequiredError(
+      '作業ディレクトリ外へ到達できる絶対パスは実行前に相談が必要です。',
+      'scope',
+      { command },
+    );
   }
   if (/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(command)) {
     throw new DecisionRequiredError(

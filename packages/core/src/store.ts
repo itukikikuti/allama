@@ -124,18 +124,19 @@ export class TaskStore {
     return this.getTask(id);
   }
 
-  public hasCloudSecretOverride(id: string): boolean {
+  public allowedSecretFingerprints(id: string): string[] {
     const row = this.database
-      .prepare('SELECT cloud_secret_override FROM tasks WHERE id = ?')
+      .prepare('SELECT allowed_secret_fingerprints_json FROM tasks WHERE id = ?')
       .get(id) as SqlRow | undefined;
     if (!row) throw new Error(`Task not found: ${id}`);
-    return Number(row.cloud_secret_override) === 1;
+    return JSON.parse(String(row.allowed_secret_fingerprints_json)) as string[];
   }
 
-  public setCloudSecretOverride(id: string, enabled: boolean): void {
+  public allowSecretFingerprints(id: string, fingerprints: string[]): void {
+    const allowed = [...new Set([...this.allowedSecretFingerprints(id), ...fingerprints])];
     this.database
-      .prepare('UPDATE tasks SET cloud_secret_override = ?, updated_at = ? WHERE id = ?')
-      .run(enabled ? 1 : 0, now(), id);
+      .prepare('UPDATE tasks SET allowed_secret_fingerprints_json = ?, updated_at = ? WHERE id = ?')
+      .run(JSON.stringify(allowed), now(), id);
   }
 
   public addUserMessage(taskId: string, content: string): void {
@@ -154,6 +155,11 @@ export class TaskStore {
   }
 
   public lastDecisionReason(taskId: string): string | null {
+    const data = this.lastDecisionData(taskId);
+    return typeof data?.reason === 'string' ? data.reason : null;
+  }
+
+  public lastDecisionData(taskId: string): Record<string, unknown> | null {
     const row = this.database
       .prepare(
         `SELECT data_json FROM events
@@ -161,8 +167,7 @@ export class TaskStore {
       )
       .get(taskId) as SqlRow | undefined;
     if (!row) return null;
-    const data = JSON.parse(String(row.data_json)) as { reason?: unknown };
-    return typeof data.reason === 'string' ? data.reason : null;
+    return JSON.parse(String(row.data_json)) as Record<string, unknown>;
   }
 
   public appendEvent(
