@@ -2,11 +2,17 @@
 
 ## Packages
 
-- `packages/protocol`: Zodで定義した契約、タスク、イベント、API入出力。
+- `packages/protocol`: Zodで定義した仕事アイテム、契約、実行タスク、イベント、API入出力。
 - `packages/core`: SQLite台帳、Ollama、状態機械、安全ポリシー、ツール、Git worktree。
 - `apps/cli`: Commander CLI、Ink TUI、Fastify REST/SSE API。
 
 ## Task lifecycle
+
+利用者が直接扱う`work_items`は、担当が`user`または`ai`で、期日・優先度を持ちます。AI依頼は
+`open -> in_progress -> waiting -> done`と進み、確認が必要になるたびに同じ実行タスクへリンクした
+`user`担当の承認・質問アイテムを作ります。回答済みアイテムは履歴として残ります。
+
+低レベルのAI実行は従来の状態機械で管理します。
 
 ```text
 contract_proposed -> awaiting_approval -> executing -> verifying -> completed
@@ -36,6 +42,6 @@ contract_proposed -> awaiting_approval -> executing -> verifying -> completed
 
 ## Persistence
 
-`%LOCALAPPDATA%\allama\state.db`にタスク、イベント、ツール結果、追加指示、記憶候補を保存します。
+`%LOCALAPPDATA%\allama\state.db`に相互タスクリスト、実行タスク、イベント、ツール結果、追加指示、記憶候補を保存します。
 設定とAPIトークンは`%LOCALAPPDATA%\allama\config.json`へ保存します。記憶は`pending`から
 ユーザー操作でのみ`approved`または`rejected`へ変わります。

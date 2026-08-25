@@ -1,8 +1,12 @@
 # Allama
 
-Allama（アラマ）は、Ollamaで動くWindows向けの「報連相できる開発秘書」です。変更前に
-作業契約を提示し、承認された範囲だけを専用Git worktreeで変更します。作業中は節目と60秒
-ごとに報告し、範囲外・機密情報・破壊的操作を検出すると停止して相談します。
+Allama（アラマ）は、あなたとAIの仕事を1つのタスクリストに集めるWindows向けの仕事管理CLIです。
+あなたはAIのリストへ依頼を追加し、AIは確認・承認・判断が必要になったらあなたのリストへ仕事を
+返します。期日順に自分のリストを処理すれば、AI側の作業が再開します。
+
+v0.2は仕組みを理解できる最小版です。タスク管理自体は開発以外の仕事も登録できますが、AIが実際に
+手を動かせるのは、現時点では既存の安全な開発・ファイル操作エンジンだけです。メール、カレンダー、
+各種SaaSへの接続はまだ行いません。
 
 ## 必要環境
 
@@ -20,8 +24,7 @@ Allama（アラマ）は、Ollamaで動くWindows向けの「報連相できる�
 ```powershell
 git clone https://github.com/itukikikuti/allama.git
 cd allama
-Set-ExecutionPolicy -Scope Process Bypass
-./scripts/install.ps1
+.\scripts\install.cmd
 allama doctor
 ```
 
@@ -33,17 +36,46 @@ corepack pnpm build
 corepack pnpm allama -- --help
 ```
 
-## 基本操作
+## 最小ワークフロー
 
 ```powershell
-# 対話モード
+# あなたとAIの未完了タスクを1画面で確認
 allama
 
-# 新しい依頼。契約カードを確認してから実行
+# AIへ依頼。AIはすぐに依頼を整理し、必要な承認をあなたのリストへ追加
+allama add "失敗しているテストを直して" -C C:\src\my-project --due 明日 --priority high
+
+# あなたが回答すべき項目だけを表示
+allama inbox
+
+# 契約や質問の詳細を確認
+allama show <work-item-id>
+
+# 承認または却下。承認後はAI作業が再開
+allama answer <work-item-id> --yes
+allama answer <work-item-id> "公開APIは変更しないで" --yes
+allama answer <work-item-id> --no
+
+# 全履歴を含む統合タスクリスト
+allama tasks
+
+# Ollamaが停止中でも先に依頼だけ記録
+allama add "あとで調査する" --due 2026-09-01 --no-plan
+allama work
+```
+
+優先度は`urgent`、`high`、`normal`、`low`です。期日は`YYYY-MM-DD`、`今日`、`明日`で
+指定できます。あなた向けの確認項目は、元のAIタスクと同じ期日・優先度を引き継ぎます。
+
+## 開発エージェントの直接操作
+
+タスクリストを介さず、従来どおりその場で開発タスクを実行することもできます。
+
+```powershell
 allama run -C C:\src\my-project "失敗しているテストを直して"
 
 # 保存されたタスクを確認・再開
-allama tasks
+allama tasks --runs
 allama resume <task-id>
 
 # 完了済みworktreeのコミットを、明示確認後に元ブランチへ取り込む
@@ -95,9 +127,10 @@ corepack pnpm test
 
 構成は[アーキテクチャ](docs/architecture.md)、受け入れ基準は[評価方法](docs/evaluation.md)にまとめています。
 
-## v0.1の制限
+## v0.2の制限
 
 - WindowsとPowerShellを優先しています。
-- CLIを終了すると実行も停止します。SQLite台帳から`allama resume`で再開できます。
-- メール、カレンダー、SaaS連携、複数ユーザー、常駐Windowsサービスは対象外です。
-- Node.jsの`node:sqlite`を使用しているため、Nodeの実行時にExperimentalWarningが表示される場合があります。
+- `add`による依頼整理と`answer`後のAI実行は、そのCLIプロセス内で行います。常駐ワーカーはまだありません。
+- メール、カレンダー、SaaS連携は未実装です。それらの仕事を一覧へ記録することはできます。
+- AIの自動実行はコード調査・編集・テスト・Git・開発文書に限定しています。
+- 複数端末同期、通知、GUI、複数ユーザーはまだありません。
