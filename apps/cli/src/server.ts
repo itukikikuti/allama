@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 
 import {
   AddMessageSchema,
+  CreateWorkItemSchema,
   CreateTaskSchema,
   DecisionSchema,
   type AllamaEngine,
@@ -35,6 +36,26 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
   };
 
   app.get('/health', async () => ({ ok: true }));
+
+  app.get('/v1/work-items', async (request) => {
+    const query = request.query as { owner?: 'user' | 'ai'; all?: string };
+    const items =
+      query.all === 'true'
+        ? dependencies.store.listWorkItems()
+        : dependencies.store.listOpenWorkItems(query.owner);
+    return { items };
+  });
+
+  app.post('/v1/work-items', async (request, reply) => {
+    const input = CreateWorkItemSchema.parse(request.body);
+    const item = dependencies.store.createWorkItem(input);
+    return await reply.code(201).send({ item });
+  });
+
+  app.get('/v1/work-items/:id', async (request) => {
+    const { id } = request.params as { id: string };
+    return { item: dependencies.store.getWorkItem(id) };
+  });
 
   app.get('/v1/tasks', async () => ({ tasks: dependencies.store.listTasks() }));
 

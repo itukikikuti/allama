@@ -56,6 +56,21 @@ describe('Allama API', () => {
     });
     expect(response.statusCode).toBe(201);
     expect(response.json().task.status).toBe('awaiting_approval');
+
+    const workItemResponse = await app.inject({
+      method: 'POST',
+      url: '/v1/work-items',
+      headers: { authorization: 'Bearer test-token' },
+      payload: { title: 'Reply to the customer', dueAt: '2030-01-01T00:00:00.000Z' },
+    });
+    expect(workItemResponse.statusCode).toBe(201);
+    expect(workItemResponse.json().item).toMatchObject({ owner: 'ai', status: 'open' });
+    const agendaResponse = await app.inject({
+      method: 'GET',
+      url: '/v1/work-items',
+      headers: { authorization: 'Bearer test-token' },
+    });
+    expect(agendaResponse.json().items).toHaveLength(1);
     await app.close();
   });
 });

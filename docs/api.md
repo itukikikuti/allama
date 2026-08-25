@@ -8,6 +8,9 @@
 | Method | Path                     | Purpose                                       |
 | ------ | ------------------------ | --------------------------------------------- |
 | `GET`  | `/health`                | APIプロセスの確認                             |
+| `GET`  | `/v1/work-items`         | 未完了の統合タスクリスト。`owner`で担当を絞る |
+| `POST` | `/v1/work-items`         | AIまたはユーザーの仕事アイテムを追加          |
+| `GET`  | `/v1/work-items/:id`     | 仕事アイテムの詳細                            |
 | `GET`  | `/v1/tasks`              | タスク一覧                                    |
 | `POST` | `/v1/tasks`              | 契約作成。本文は`prompt`と`repositoryPath`    |
 | `GET`  | `/v1/tasks/:id`          | タスクとイベント取得                          |
