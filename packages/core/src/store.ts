@@ -124,6 +124,47 @@ export class TaskStore {
     return this.getTask(id);
   }
 
+  public hasCloudSecretOverride(id: string): boolean {
+    const row = this.database
+      .prepare('SELECT cloud_secret_override FROM tasks WHERE id = ?')
+      .get(id) as SqlRow | undefined;
+    if (!row) throw new Error(`Task not found: ${id}`);
+    return Number(row.cloud_secret_override) === 1;
+  }
+
+  public setCloudSecretOverride(id: string, enabled: boolean): void {
+    this.database
+      .prepare('UPDATE tasks SET cloud_secret_override = ?, updated_at = ? WHERE id = ?')
+      .run(enabled ? 1 : 0, now(), id);
+  }
+
+  public addUserMessage(taskId: string, content: string): void {
+    this.getTask(taskId);
+    this.database
+      .prepare('INSERT INTO task_messages (task_id, content, created_at) VALUES (?, ?, ?)')
+      .run(taskId, content, now());
+    this.appendEvent(taskId, 'progress', '追加指示を受け付けました。', { userMessage: content });
+  }
+
+  public listUserMessages(taskId: string): string[] {
+    const rows = this.database
+      .prepare('SELECT content FROM task_messages WHERE task_id = ? ORDER BY id')
+      .all(taskId) as SqlRow[];
+    return rows.map((row) => String(row.content));
+  }
+
+  public lastDecisionReason(taskId: string): string | null {
+    const row = this.database
+      .prepare(
+        `SELECT data_json FROM events
+         WHERE task_id = ? AND kind = 'decision_required' ORDER BY id DESC LIMIT 1`,
+      )
+      .get(taskId) as SqlRow | undefined;
+    if (!row) return null;
+    const data = JSON.parse(String(row.data_json)) as { reason?: unknown };
+    return typeof data.reason === 'string' ? data.reason : null;
+  }
+
   public appendEvent(
     taskId: string,
     kind: EventKind,

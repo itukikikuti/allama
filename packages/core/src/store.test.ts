@@ -55,4 +55,14 @@ describe('TaskStore', () => {
     expect(memory.status).toBe('pending');
     expect(tasks.decideMemory(memory.id, true).status).toBe('approved');
   });
+
+  it('persists additional instructions and explicit secret overrides', () => {
+    const tasks = store();
+    const task = tasks.createTask('Inspect', 'C:\\repo');
+    tasks.addUserMessage(task.id, 'Do not change the public API');
+    expect(tasks.listUserMessages(task.id)).toEqual(['Do not change the public API']);
+    expect(tasks.hasCloudSecretOverride(task.id)).toBe(false);
+    tasks.setCloudSecretOverride(task.id, true);
+    expect(tasks.hasCloudSecretOverride(task.id)).toBe(true);
+  });
 });

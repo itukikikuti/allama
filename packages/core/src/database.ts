@@ -19,6 +19,7 @@ export function openDatabase(path = stateDatabasePath()): DatabaseSync {
       worktree_path TEXT,
       base_branch TEXT,
       summary TEXT,
+      cloud_secret_override INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -52,6 +53,18 @@ export function openDatabase(path = stateDatabasePath()): DatabaseSync {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS task_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
   `);
+  const taskColumns = database.prepare('PRAGMA table_info(tasks)').all() as Array<{
+    name: string;
+  }>;
+  if (!taskColumns.some((column) => column.name === 'cloud_secret_override')) {
+    database.exec('ALTER TABLE tasks ADD COLUMN cloud_secret_override INTEGER NOT NULL DEFAULT 0;');
+  }
   return database;
 }

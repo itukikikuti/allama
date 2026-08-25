@@ -105,6 +105,23 @@ export const ALLAMA_TOOLS: OllamaTool[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'propose_memory',
+      description:
+        'Propose a durable user preference or project rule. It remains pending until the user explicitly approves it.',
+      parameters: {
+        type: 'object',
+        properties: {
+          content: { type: 'string' },
+          scope: { type: 'string', enum: ['user', 'project'] },
+        },
+        required: ['content', 'scope'],
+        additionalProperties: false,
+      },
+    },
+  },
 ];
 
 type ToolArguments = Record<string, unknown>;
@@ -204,6 +221,21 @@ export class ToolRunner {
         const next = stringArgument(args, 'next');
         this.store.appendEvent(this.taskId, 'progress', message, { next });
         return { reported: true };
+      }
+      case 'propose_memory': {
+        const content = stringArgument(args, 'content');
+        const scope = stringArgument(args, 'scope');
+        if (scope !== 'user' && scope !== 'project') {
+          throw new Error('Memory scope must be user or project.');
+        }
+        const task = this.store.getTask(this.taskId);
+        const memory = this.store.proposeMemory(
+          content,
+          scope,
+          scope === 'project' ? task.repositoryPath : null,
+          task.id,
+        );
+        return { memoryId: memory.id, status: memory.status };
       }
       default:
         throw new Error(`Unknown tool: ${call.function.name}`);

@@ -45,17 +45,41 @@ export class AllamaEngine {
   public async plan(prompt: string, repositoryPath: string): Promise<Task> {
     const task = this.store.createTask(prompt, repositoryPath);
     try {
-      assertCloudSafe(prompt, '依頼文');
+      if (!this.store.hasCloudSecretOverride(task.id)) assertCloudSafe(prompt, '依頼文');
       const contract = await proposeContract(this.ollama, this.config, prompt, repositoryPath);
       return this.store.setContract(task.id, contract);
     } catch (error) {
       this.handleError(task.id, error);
+      if (error instanceof DecisionRequiredError) return this.store.getTask(task.id);
       throw error;
     }
   }
 
   public approve(taskId: string): Task {
     return this.store.approveContract(taskId);
+  }
+
+  public async decide(taskId: string, approved: boolean, message?: string): Promise<Task> {
+    const task = this.store.getTask(taskId);
+    if (message) this.store.addUserMessage(taskId, message);
+    if (!approved) return this.cancel(taskId);
+    if (task.status === 'awaiting_approval') return this.approve(taskId);
+    if (task.status !== 'awaiting_decision') {
+      throw new Error(`Task ${taskId} is not awaiting a decision.`);
+    }
+    if (this.store.lastDecisionReason(taskId) === 'secret') {
+      this.store.setCloudSecretOverride(taskId, true);
+    }
+    if (!task.contract) {
+      const contract = await proposeContract(
+        this.ollama,
+        this.config,
+        task.prompt,
+        task.repositoryPath,
+      );
+      return this.store.setContract(task.id, contract);
+    }
+    return this.store.setStatus(taskId, 'executing', 'ユーザー判断を反映して再開します。');
   }
 
   public cancel(taskId: string): Task {
@@ -102,6 +126,10 @@ export class AllamaEngine {
           content: `${contractMessage(contract)}\n\nOriginal request:\n${task.prompt}`,
         },
       ];
+      let knownUserMessages = this.store.listUserMessages(task.id);
+      for (const message of knownUserMessages) {
+        messages.push({ role: 'user', content: `Additional instruction:\n${message}` });
+      }
       const runner = new ToolRunner(task.id, workspacePath, contract, this.store, this.git);
       const heartbeat = setInterval(() => {
         this.store.appendEvent(
@@ -120,7 +148,14 @@ export class AllamaEngine {
             this.cancel(task.id);
             throw new Error('Task cancelled.');
           }
-          assertCloudSafe(outgoingText(messages), 'モデル入力');
+          const latestUserMessages = this.store.listUserMessages(task.id);
+          for (const message of latestUserMessages.slice(knownUserMessages.length)) {
+            messages.push({ role: 'user', content: `New instruction from the user:\n${message}` });
+          }
+          knownUserMessages = latestUserMessages;
+          if (!this.store.hasCloudSecretOverride(task.id)) {
+            assertCloudSafe(outgoingText(messages), 'モデル入力');
+          }
           const response = await this.ollama.chat({
             model: this.config.executorModel,
             messages,
