@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+- Removed blanket work-contract approval tasks from the user's inbox.
+- AI requests now start automatically and only concrete decisions are assigned to the user.
+- Added decision-specific task titles for Git initialization, dependencies, secrets, network, and scope changes.
+- Added a user-inbox location question when a new project is requested from a protected home directory.
+
 ## 0.2.0
 
 - Added one due-date and priority ordered task list shared by the user and AI.

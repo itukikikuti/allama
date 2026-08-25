@@ -42,16 +42,16 @@ corepack pnpm allama -- --help
 # あなたとAIの未完了タスクを1画面で確認
 allama
 
-# AIへ依頼。AIはすぐに依頼を整理し、必要な承認をあなたのリストへ追加
+# AIへ依頼。AIは自動着手し、本当に判断が必要な事項だけをあなたのリストへ追加
 allama add "失敗しているテストを直して" -C C:\src\my-project --due 明日 --priority high
 
 # あなたが回答すべき項目だけを表示
 allama inbox
 
-# 契約や質問の詳細を確認
+# 質問や承認事項の詳細を確認
 allama show <work-item-id>
 
-# 承認または却下。承認後はAI作業が再開
+# AIから求められた判断へ回答。回答後はAI作業が再開
 allama answer <work-item-id> --yes
 allama answer <work-item-id> "公開APIは変更しないで" --yes
 allama answer <work-item-id> --no
@@ -66,6 +66,17 @@ allama work
 
 優先度は`urgent`、`high`、`normal`、`low`です。期日は`YYYY-MM-DD`、`今日`、`明日`で
 指定できます。あなた向けの確認項目は、元のAIタスクと同じ期日・優先度を引き継ぎます。
+通常の作業契約はAIの実行記録として保存されますが、あなたのタスクにはしません。
+制作先、依存追加、外部書き込み、機密情報、作業範囲の変更など、実際に判断が必要な場合だけ
+具体的な質問を作ります。
+
+ホームディレクトリから新規制作を依頼した場合、AllamaはホームへGitを作らず、先に「作業場所を
+指定」をあなたのリストへ追加します。専用フォルダの絶対パスを回答すると、その場所で契約を
+作り直します。
+
+```powershell
+allama answer <work-item-id> "C:\Users\me\Documents\projects\new-app"
+```
 
 ## 開発エージェントの直接操作
 
