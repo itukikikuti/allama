@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const ALLAMA_VERSION = '0.1.0';
+export const ALLAMA_VERSION = '0.2.0';
 
 export const TaskStatusSchema = z.enum([
   'contract_proposed',
@@ -39,6 +39,51 @@ export const TaskSchema = z.object({
   updatedAt: z.string(),
 });
 export type Task = z.infer<typeof TaskSchema>;
+
+export const WorkOwnerSchema = z.enum(['user', 'ai']);
+export const WorkKindSchema = z.enum(['request', 'approval', 'question', 'action']);
+export const WorkStatusSchema = z.enum(['open', 'in_progress', 'waiting', 'done', 'cancelled']);
+export const WorkPrioritySchema = z.enum(['urgent', 'high', 'normal', 'low']);
+export type WorkOwner = z.infer<typeof WorkOwnerSchema>;
+export type WorkKind = z.infer<typeof WorkKindSchema>;
+export type WorkStatus = z.infer<typeof WorkStatusSchema>;
+export type WorkPriority = z.infer<typeof WorkPrioritySchema>;
+
+export const WorkItemSchema = z.object({
+  id: z.string(),
+  owner: WorkOwnerSchema,
+  kind: WorkKindSchema,
+  title: z.string().min(1),
+  details: z.string().default(''),
+  status: WorkStatusSchema,
+  priority: WorkPrioritySchema,
+  dueAt: z.string().datetime().nullable(),
+  repositoryPath: z.string().nullable(),
+  taskId: z.string().nullable(),
+  answer: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  completedAt: z.string().nullable(),
+});
+export type WorkItem = z.infer<typeof WorkItemSchema>;
+
+export const CreateWorkItemSchema = z.object({
+  owner: WorkOwnerSchema.default('ai'),
+  kind: WorkKindSchema.default('request'),
+  title: z.string().min(1),
+  details: z.string().default(''),
+  priority: WorkPrioritySchema.default('normal'),
+  dueAt: z.string().datetime().nullable().default(null),
+  repositoryPath: z.string().nullable().default(null),
+  taskId: z.string().nullable().default(null),
+});
+export type CreateWorkItem = z.infer<typeof CreateWorkItemSchema>;
+export type CreateWorkItemInput = z.input<typeof CreateWorkItemSchema>;
+
+export const AnswerWorkItemSchema = z.object({
+  answer: z.string().default(''),
+  approved: z.boolean(),
+});
 
 export const EventKindSchema = z.enum([
   'task_created',

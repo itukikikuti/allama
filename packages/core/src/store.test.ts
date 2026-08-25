@@ -69,4 +69,45 @@ describe('TaskStore', () => {
     tasks.allowSecretFingerprints(task.id, ['fingerprint-1']);
     expect(tasks.allowedSecretFingerprints(task.id)).toEqual(['fingerprint-1']);
   });
+
+  it('keeps user and AI work in one due-date ordered agenda', () => {
+    const tasks = store();
+    const later = tasks.createWorkItem({
+      title: 'Later AI task',
+      dueAt: '2030-01-02T12:00:00.000Z',
+    });
+    const first = tasks.createWorkItem({
+      owner: 'user',
+      kind: 'approval',
+      title: 'Answer AI question',
+      priority: 'high',
+      dueAt: '2030-01-01T12:00:00.000Z',
+    });
+    tasks.createWorkItem({ title: 'Urgent without a deadline', priority: 'urgent' });
+
+    expect(tasks.listOpenWorkItems().map((item) => item.id)).toEqual([
+      first.id,
+      later.id,
+      expect.any(String),
+    ]);
+    expect(tasks.nextAiWorkItem()?.id).toBe(later.id);
+  });
+
+  it('links a user decision to an execution task and records the answer', () => {
+    const tasks = store();
+    const task = tasks.createTask('Draft a reply', 'C:\\repo');
+    const item = tasks.createWorkItem({
+      owner: 'user',
+      kind: 'question',
+      title: 'Which tone should be used?',
+    });
+    tasks.linkWorkItem(item.id, task.id);
+
+    expect(tasks.findOpenWorkItemForTask(task.id, 'user')?.id).toBe(item.id);
+    expect(tasks.answerWorkItem(item.id, 'Use a friendly tone')).toMatchObject({
+      status: 'done',
+      answer: 'Use a friendly tone',
+      completedAt: expect.any(String),
+    });
+  });
 });

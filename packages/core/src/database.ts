@@ -59,6 +59,25 @@ export function openDatabase(path = stateDatabasePath()): DatabaseSync {
       content TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS work_items (
+      id TEXT PRIMARY KEY,
+      owner TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      title TEXT NOT NULL,
+      details TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL,
+      priority TEXT NOT NULL,
+      due_at TEXT,
+      repository_path TEXT,
+      task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
+      answer TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      completed_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS work_items_agenda
+      ON work_items(status, owner, due_at, priority, created_at);
+    CREATE INDEX IF NOT EXISTS work_items_task_id ON work_items(task_id);
   `);
   const taskColumns = database.prepare('PRAGMA table_info(tasks)').all() as Array<{
     name: string;

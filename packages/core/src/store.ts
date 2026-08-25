@@ -2,17 +2,23 @@ import type { DatabaseSync } from 'node:sqlite';
 
 import {
   ContractSchema,
+  CreateWorkItemSchema,
   EventKindSchema,
   MemorySchema,
   TaskEventSchema,
   TaskSchema,
   TaskStatusSchema,
+  WorkItemSchema,
+  WorkStatusSchema,
   type Contract,
+  type CreateWorkItemInput,
   type EventKind,
   type Memory,
   type Task,
   type TaskEvent,
   type TaskStatus,
+  type WorkItem,
+  type WorkStatus,
 } from '@allama/protocol';
 import { nanoid } from 'nanoid';
 
@@ -49,6 +55,31 @@ function mapEvent(row: SqlRow): TaskEvent {
   });
 }
 
+function mapWorkItem(row: SqlRow): WorkItem {
+  return WorkItemSchema.parse({
+    id: row.id,
+    owner: row.owner,
+    kind: row.kind,
+    title: row.title,
+    details: row.details,
+    status: row.status,
+    priority: row.priority,
+    dueAt: row.due_at,
+    repositoryPath: row.repository_path,
+    taskId: row.task_id,
+    answer: row.answer,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    completedAt: row.completed_at,
+  });
+}
+
+const WORK_ITEM_ORDER = `
+  CASE WHEN due_at IS NULL THEN 1 ELSE 0 END,
+  due_at ASC,
+  CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
+  created_at ASC`;
+
 export class TaskStore {
   public constructor(private readonly database: DatabaseSync) {}
 
@@ -79,6 +110,121 @@ export class TaskStore {
         .prepare('SELECT * FROM tasks ORDER BY created_at DESC LIMIT ?')
         .all(limit) as SqlRow[]
     ).map(mapTask);
+  }
+
+  public createWorkItem(input: CreateWorkItemInput): WorkItem {
+    const parsed = CreateWorkItemSchema.parse(input);
+    const id = nanoid(12);
+    const timestamp = now();
+    this.database
+      .prepare(
+        `INSERT INTO work_items
+          (id, owner, kind, title, details, status, priority, due_at, repository_path,
+           task_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        id,
+        parsed.owner,
+        parsed.kind,
+        parsed.title,
+        parsed.details,
+        parsed.priority,
+        parsed.dueAt,
+        parsed.repositoryPath,
+        parsed.taskId,
+        timestamp,
+        timestamp,
+      );
+    return this.getWorkItem(id);
+  }
+
+  public getWorkItem(id: string): WorkItem {
+    const row = this.database.prepare('SELECT * FROM work_items WHERE id = ?').get(id) as
+      SqlRow | undefined;
+    if (!row) throw new Error(`Work item not found: ${id}`);
+    return mapWorkItem(row);
+  }
+
+  public listOpenWorkItems(owner?: 'user' | 'ai', limit = 100): WorkItem[] {
+    const rows = owner
+      ? this.database
+          .prepare(
+            `SELECT * FROM work_items
+             WHERE owner = ? AND status IN ('open', 'in_progress', 'waiting')
+             ORDER BY ${WORK_ITEM_ORDER} LIMIT ?`,
+          )
+          .all(owner, limit)
+      : this.database
+          .prepare(
+            `SELECT * FROM work_items
+             WHERE status IN ('open', 'in_progress', 'waiting')
+             ORDER BY ${WORK_ITEM_ORDER} LIMIT ?`,
+          )
+          .all(limit);
+    return (rows as SqlRow[]).map(mapWorkItem);
+  }
+
+  public listWorkItems(limit = 100): WorkItem[] {
+    return (
+      this.database
+        .prepare(`SELECT * FROM work_items ORDER BY ${WORK_ITEM_ORDER} LIMIT ?`)
+        .all(limit) as SqlRow[]
+    ).map(mapWorkItem);
+  }
+
+  public nextAiWorkItem(): WorkItem | null {
+    const row = this.database
+      .prepare(
+        `SELECT * FROM work_items WHERE owner = 'ai' AND status = 'open'
+         ORDER BY ${WORK_ITEM_ORDER} LIMIT 1`,
+      )
+      .get() as SqlRow | undefined;
+    return row ? mapWorkItem(row) : null;
+  }
+
+  public findOpenWorkItemForTask(taskId: string, owner: 'user' | 'ai'): WorkItem | null {
+    const row = this.database
+      .prepare(
+        `SELECT * FROM work_items
+         WHERE task_id = ? AND owner = ? AND status IN ('open', 'in_progress', 'waiting')
+         ORDER BY created_at DESC LIMIT 1`,
+      )
+      .get(taskId, owner) as SqlRow | undefined;
+    return row ? mapWorkItem(row) : null;
+  }
+
+  public linkWorkItem(id: string, taskId: string): WorkItem {
+    this.getTask(taskId);
+    this.database
+      .prepare('UPDATE work_items SET task_id = ?, updated_at = ? WHERE id = ?')
+      .run(taskId, now(), id);
+    return this.getWorkItem(id);
+  }
+
+  public setWorkItemStatus(id: string, status: WorkStatus): WorkItem {
+    const parsed = WorkStatusSchema.parse(status);
+    const timestamp = now();
+    this.database
+      .prepare(`UPDATE work_items SET status = ?, updated_at = ?, completed_at = ? WHERE id = ?`)
+      .run(parsed, timestamp, parsed === 'done' || parsed === 'cancelled' ? timestamp : null, id);
+    return this.getWorkItem(id);
+  }
+
+  public answerWorkItem(id: string, answer: string): WorkItem {
+    const item = this.getWorkItem(id);
+    if (item.owner !== 'user') throw new Error('Only user work items can be answered.');
+    if (!['open', 'waiting'].includes(item.status)) {
+      throw new Error(`Work item ${id} cannot be answered from ${item.status}.`);
+    }
+    const timestamp = now();
+    this.database
+      .prepare(
+        `UPDATE work_items
+         SET answer = ?, status = 'done', updated_at = ?, completed_at = ? WHERE id = ?`,
+      )
+      .run(answer, timestamp, timestamp, id);
+    return this.getWorkItem(id);
   }
 
   public setContract(id: string, contract: Contract): Task {
