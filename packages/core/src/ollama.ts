@@ -137,12 +137,25 @@ export class OllamaClient {
     messages: OllamaMessage[],
     schema: Record<string, unknown>,
   ): Promise<T> {
+    const schemaInstruction = `The response must be valid JSON matching this exact JSON Schema. Do not rename, add, or omit fields. Return JSON only.\n${JSON.stringify(schema)}`;
+    const structuredMessages =
+      messages[0]?.role === 'system'
+        ? [
+            { ...messages[0], content: `${messages[0].content}\n\n${schemaInstruction}` },
+            ...messages.slice(1),
+          ]
+        : [{ role: 'system' as const, content: schemaInstruction }, ...messages];
     let response: Response;
     try {
       response = await fetch(new URL('/api/chat', this.baseUrl), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ model, messages, format: schema, stream: false }),
+        body: JSON.stringify({
+          model,
+          messages: structuredMessages,
+          format: schema,
+          stream: false,
+        }),
       });
     } catch {
       throw new OllamaError(
@@ -154,11 +167,16 @@ export class OllamaClient {
     const body = (await response.json()) as OllamaChunk;
     const content = body.message?.content;
     if (!content) throw new OllamaError('構造化応答が空です。', 'invalid_response');
-    try {
-      return JSON.parse(content) as T;
-    } catch {
-      throw new OllamaError('構造化応答をJSONとして解析できません。', 'invalid_response');
+    const trimmed = content.trim();
+    const fenced = /```(?:json)?\s*([\s\S]*?)\s*```/i.exec(trimmed)?.[1]?.trim();
+    for (const candidate of fenced ? [trimmed, fenced] : [trimmed]) {
+      try {
+        return JSON.parse(candidate) as T;
+      } catch {
+        // Try the next safe representation before reporting an invalid response.
+      }
     }
+    throw new OllamaError('構造化応答をJSONとして解析できません。', 'invalid_response');
   }
 
   private async toError(response: Response): Promise<OllamaError> {
