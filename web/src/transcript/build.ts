@@ -54,6 +54,12 @@ export function buildItems(turns: TurnData[]): Item[] {
         } else if (ev.subtype === 'task_progress' && ev.tool_use_id) {
           const a = agents.get(ev.tool_use_id);
           if (a) a.agent = { ...a.agent, progress: ev.description };
+        } else if (ev.subtype === 'api_retry') {
+          // 再試行は何度も届くので、直前の再試行の知らせを書き換える
+          const text = `APIエラーのため再試行中（${ev.error_status ?? ''} ${ev.error ?? ''}、${ev.attempt}/${ev.max_retries}回目）`;
+          const last = target[target.length - 1];
+          if (last?.kind === 'note' && last.text.startsWith('APIエラーのため再試行中')) last.text = text;
+          else target.push({ kind: 'note', text });
         }
         continue;
       }
