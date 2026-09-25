@@ -37,6 +37,10 @@ interface Tail {
   child?: ChildProcess;
   lastResult?: any;
   resultAt?: number;
+  /** 直近のAPI再試行（結果を出さずに終わったときの原因の手がかり） */
+  lastRetry?: any;
+  /** サーバーが止まっている間に終わっていた（中断された）ターン */
+  interrupted?: boolean;
 }
 
 export interface CreateSessionOptions {
@@ -108,6 +112,7 @@ export class Runner {
         offset: 0,
         rest: Buffer.alloc(0),
         exited: !(s.pid && isAlive(s.pid)),
+        interrupted: !(s.pid && isAlive(s.pid)),
       });
     }
     setInterval(() => this.poll(), 500);
@@ -327,6 +332,7 @@ export class Runner {
           tail.lastResult = ev;
           tail.resultAt = Date.now();
         }
+        if (ev.type === 'system' && ev.subtype === 'api_retry') tail.lastRetry = ev;
         if (ev.type === 'system' && ev.subtype === 'post_turn_summary' && ev.status_detail) {
           this.app.store.updateSession(meta.id, { summary: String(ev.status_detail) }, false);
         }
@@ -349,8 +355,12 @@ export class Runner {
       lastError = String(r.result ?? r.subtype ?? 'エラー');
     } else if (!r) {
       status = 'error';
+      const retry = tail.lastRetry
+        ? `APIエラーで止まった（${tail.lastRetry.error_status ?? ''} ${tail.lastRetry.error ?? ''}）`
+        : '';
       const err = readText(turnFile(config.dataDir, meta.id, tail.turn, 'err.txt')).trim();
-      lastError = truncate(err || `結果を返さずに終了した（終了コード ${tail.exitCode ?? '不明'}）`, 2000);
+      const reason = retry || err || `結果を返さずに終了した（終了コード ${tail.exitCode ?? '不明'}）`;
+      lastError = truncate(tail.interrupted ? `サーバーの再起動で中断された（${reason}）` : reason, 2000);
     }
     store.updateSession(meta.id, {
       status,
