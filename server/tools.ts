@@ -77,6 +77,8 @@ export async function callTool(app: App, sessionId: string, name: string, a: any
     case 'close_task': {
       const task = store.task(a.task_id);
       if (!task) throw new Error(`タスクが見つからない: ${a.task_id}`);
+      // ユーザーが返事をして閉じたタスクの記録（返事の中身）を上書きしない
+      if (task.status === 'done') return `もう閉じている: ${task.title}（返事: ${task.answer ?? ''}）`;
       store.updateTask(task.id, {
         status: 'done',
         closedAt: nowIso(),
