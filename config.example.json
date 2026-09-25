@@ -1,0 +1,19 @@
+{
+  "ownerName": "ユーザー",
+  "host": "127.0.0.1",
+  "port": 3170,
+  "dataDir": "~/.atama",
+  "defaultCwd": "~",
+  "timezone": "Asia/Tokyo",
+  "ollamaHost": "http://127.0.0.1:11434",
+  "models": [
+    { "id": "deepseek", "label": "Ollama: deepseek-v4.1-flash", "ollama": "deepseek-v4.1-flash:cloud" },
+    { "id": "kimi", "label": "Ollama: kimi-k2.7-code", "ollama": "kimi-k2.7-code:cloud" },
+    { "id": "claude", "label": "Claude", "command": ["claude"] },
+    { "id": "claude-opus", "label": "Claude Opus", "command": ["claude", "--model", "opus"] }
+  ],
+  "defaultModelId": "deepseek",
+  "authToken": "",
+  "fallbackPatrolHours": 6,
+  "extraClaudeArgs": []
+}

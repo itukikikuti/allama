@@ -1,0 +1,19 @@
+# systemd のユーザーサービス。~/.config/systemd/user/atama.service に置く。
+# ・WorkingDirectory と ExecStart の node のパスは自分の環境に合わせる（nvm なら `which node` の結果）
+# ・KillMode=process にしているので、サーバーを再起動しても作業中の手（Claude Code）は止まらない
+
+[Unit]
+Description=atama (Claude Code を手として使う頭)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/atama
+ExecStart=/usr/bin/node --no-warnings server/main.ts
+Restart=always
+RestartSec=3
+KillMode=process
+Environment=PATH=%h/.local/bin:%h/.npm-global/bin:/usr/local/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=default.target
