@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import type { AppState, SessionMeta, Task, TaskKind } from '../../../shared/types.ts';
 import { api } from '../api.ts';
+import { AttachButton, AttachChips, useAttachments } from '../components/Attachments.tsx';
 import { Markdown } from '../components/Markdown.tsx';
 import { ago, cx, dateTime, loadPref, savePref } from '../util.ts';
 
@@ -120,15 +121,23 @@ function Composer({ state }: { state: AppState }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [started, setStarted] = useState<SessionMeta | null>(null);
+  const up = useAttachments();
   const ref = useAutoGrow(text);
+  const ready = Boolean(text.trim() || up.files.length);
 
   const submit = async () => {
-    if (!text.trim() || busy) return;
+    if (!ready || busy || up.busy) return;
     setBusy(true);
     setErr('');
     try {
-      const s = await api.startSession({ message: text, modelId, cwd: cwd.trim() || undefined });
+      const s = await api.startSession({
+        message: text,
+        modelId,
+        cwd: cwd.trim() || undefined,
+        files: up.files.map((f) => f.path),
+      });
       setText('');
+      up.clear();
       setStarted(s);
       savePref('model', modelId);
     } catch (e) {
@@ -140,6 +149,7 @@ function Composer({ state }: { state: AppState }) {
 
   return (
     <div className="composer">
+      <AttachChips up={up} />
       <textarea
         ref={ref}
         value={text}
@@ -178,7 +188,8 @@ function Composer({ state }: { state: AppState }) {
           <FolderOpen size={16} />
         </button>
         <span className="spacer" />
-        <button type="button" className="send-btn" disabled={!text.trim() || busy} onClick={submit} title="送る（Ctrl+Enter）">
+        <AttachButton up={up} />
+        <button type="button" className="send-btn" disabled={!ready || busy} onClick={submit} title="送る（Ctrl+Enter）">
           {busy ? <Loader2 className="spin" size={16} /> : <ArrowUp size={16} />}
         </button>
       </div>
@@ -196,6 +207,7 @@ function TaskCard({ task, session }: { task: Task; session?: SessionMeta }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const up = useAttachments();
   const ref = useAutoGrow(text);
   const { icon: Icon, label } = KIND[task.kind];
 
@@ -203,7 +215,8 @@ function TaskCard({ task, session }: { task: Task; session?: SessionMeta }) {
     setBusy(true);
     setErr('');
     try {
-      await api.answer(task.id, { action, text: value });
+      await api.answer(task.id, { action, text: value, files: up.files.map((f) => f.path) });
+      up.clear();
     } catch (e) {
       setErr((e as Error).message);
       setBusy(false);
@@ -245,6 +258,8 @@ function TaskCard({ task, session }: { task: Task; session?: SessionMeta }) {
         </div>
       )}
 
+      <AttachChips up={up} />
+
       <div className="answer">
         <textarea
           ref={ref}
@@ -253,15 +268,21 @@ function TaskCard({ task, session }: { task: Task; session?: SessionMeta }) {
           placeholder={placeholder}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && task.kind === 'question' && text.trim()) {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && task.kind === 'question' && (text.trim() || up.files.length)) {
               e.preventDefault();
               void send('answer');
             }
           }}
         />
         <div className="answer-actions">
+          <AttachButton up={up} />
           {task.kind === 'question' && (
-            <button type="button" className="primary" disabled={busy || !text.trim()} onClick={() => send('answer')}>
+            <button
+              type="button"
+              className="primary"
+              disabled={busy || (!text.trim() && !up.files.length)}
+              onClick={() => send('answer')}
+            >
               送る
             </button>
           )}

@@ -11,6 +11,7 @@ import { APP_DIR, getSettings, saveSettings } from './config.ts';
 import { checkModel, checkOllama } from './providers.ts';
 import { readTurns } from './transcript.ts';
 import { answerTask } from './tools.ts';
+import { attachmentNames, checkFiles, saveUpload, withAttachments } from './uploads.ts';
 import { retention } from './memory/index.ts';
 import { embed, pull } from './memory/ollama.ts';
 
@@ -45,10 +46,27 @@ export function startHttp(app: App): void {
     }),
   );
 
+  // 画面から預かったファイルを置く。置いたパスを、そのままセッションへのメッセージに添える
+  api.post('/uploads', async (c) => {
+    const file = (await c.req.parseBody()).file;
+    if (!(file instanceof File)) throw new Error('ファイルが無い');
+    return c.json(await saveUpload(app.config, file));
+  });
+
   api.post('/sessions', async (c) => {
     const b = await c.req.json();
-    if (!String(b.message ?? '').trim()) throw new Error('頼みたいことを書いて');
-    return c.json(app.runner.createSession({ message: String(b.message), modelId: b.modelId, cwd: b.cwd, trigger: 'user' }));
+    const files = checkFiles(app.config, b.files);
+    const text = String(b.message ?? '').trim();
+    if (!text && !files.length) throw new Error('頼みたいことを書いて');
+    return c.json(
+      app.runner.createSession({
+        message: withAttachments(text, files),
+        title: text ? undefined : `添付: ${attachmentNames(files)}`,
+        modelId: b.modelId,
+        cwd: b.cwd,
+        trigger: 'user',
+      }),
+    );
   });
 
   api.get('/sessions/:id/transcript', (c) => {
@@ -59,9 +77,17 @@ export function startHttp(app: App): void {
 
   // セッション画面からの返信。作業中なら区切りがついたときに届く
   api.post('/sessions/:id/message', async (c) => {
-    const text = String((await c.req.json()).text ?? '').trim();
-    if (!text) throw new Error('メッセージを書いて');
-    return c.json({ result: app.runner.send(c.req.param('id'), { text, source: 'user', at: new Date().toISOString() }) });
+    const b = await c.req.json();
+    const files = checkFiles(app.config, b.files);
+    const text = String(b.text ?? '').trim();
+    if (!text && !files.length) throw new Error('メッセージを書いて');
+    return c.json({
+      result: app.runner.send(c.req.param('id'), {
+        text: withAttachments(text, files),
+        source: 'user',
+        at: new Date().toISOString(),
+      }),
+    });
   });
 
   api.post('/sessions/:id/stop', (c) => {

@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowUp, ChevronLeft, CircleAlert, Hand, Loader2, MessageCircleQuestion, Square } from 'lucide-react';
 import type { AppState, ServerEvent, TurnData } from '../../../shared/types.ts';
 import { api, onServerEvent } from '../api.ts';
+import { AttachButton, AttachChips, useAttachments } from '../components/Attachments.tsx';
 import { Transcript } from '../transcript/Transcript.tsx';
 import { dateTime, shortPath } from '../util.ts';
 
@@ -168,6 +169,7 @@ function ReplyBar({ sessionId, running }: { sessionId: string; running: boolean 
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const up = useAttachments();
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useLayoutEffect(() => {
@@ -178,12 +180,17 @@ function ReplyBar({ sessionId, running }: { sessionId: string; running: boolean 
   }, [text]);
 
   const send = async () => {
-    if (!text.trim() || busy) return;
+    if ((!text.trim() && !up.files.length) || busy || up.busy) return;
     setBusy(true);
     setErr('');
     try {
-      await api.sendMessage(sessionId, text);
+      await api.sendMessage(
+        sessionId,
+        text,
+        up.files.map((f) => f.path),
+      );
       setText('');
+      up.clear();
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -193,6 +200,7 @@ function ReplyBar({ sessionId, running }: { sessionId: string; running: boolean 
 
   return (
     <div className="reply-bar">
+      <AttachChips up={up} />
       <div className="reply-box">
         <textarea
           ref={ref}
@@ -207,7 +215,14 @@ function ReplyBar({ sessionId, running }: { sessionId: string; running: boolean 
             }
           }}
         />
-        <button type="button" className="send-btn" disabled={!text.trim() || busy} onClick={send} title="送る（Ctrl+Enter）">
+        <AttachButton up={up} />
+        <button
+          type="button"
+          className="send-btn"
+          disabled={(!text.trim() && !up.files.length) || busy}
+          onClick={send}
+          title="送る（Ctrl+Enter）"
+        >
           {busy ? <Loader2 className="spin" size={16} /> : <ArrowUp size={16} />}
         </button>
       </div>

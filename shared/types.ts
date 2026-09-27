@@ -75,6 +75,14 @@ export interface TurnData {
   events: any[];
 }
 
+/** 画面から預かったファイル。置いた場所をそのままセッションから読める */
+export interface UploadedFile {
+  /** 置いた絶対パス */
+  path: string;
+  name: string;
+  size: number;
+}
+
 export interface ModelOption {
   id: string;
   label: string;

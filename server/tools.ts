@@ -7,6 +7,7 @@ import type { Task, TaskKind } from '../shared/types.ts';
 import type { App } from './app.ts';
 import { Memory } from './memory/index.ts';
 import { checkBody } from './self.ts';
+import { attachmentNames, checkFiles, withAttachments } from './uploads.ts';
 import { formatTime, nowIso, shortId } from './util.ts';
 
 const text = (t: string) => ({ content: [{ type: 'text' as const, text: t }] });
@@ -204,6 +205,8 @@ export function createTools(app: App, sessionId: string) {
 export interface AnswerBody {
   action?: 'answer' | 'approve' | 'reject' | 'ack' | 'done';
   text?: string;
+  /** 画面から預かったファイルのパス */
+  files?: string[];
 }
 
 /** タスク画面からの返事。必要ならタスクに紐づくセッションへメッセージを送る */
@@ -213,28 +216,34 @@ export function answerTask(app: App, taskId: string, body: AnswerBody): Task {
   if (!task) throw new Error('タスクが見つからない');
   if (task.status === 'done') throw new Error('このタスクはもう閉じている');
   const t = body.text?.trim() ?? '';
+  const files = checkFiles(app.config, body.files);
+  const names = attachmentNames(files);
   let answer: string;
   let message: string | undefined;
 
   switch (task.kind) {
     case 'question':
-      if (!t) throw new Error('返事を入力して');
-      answer = t;
-      message = `【タスク画面からの返事】\n質問: ${task.title}\n返事: ${t}`;
+      if (!t && !files.length) throw new Error('返事を入力して');
+      answer = t || `添付: ${names}`;
+      message = withAttachments(`【タスク画面からの返事】\n質問: ${task.title}\n返事: ${answer}`, files);
       break;
     case 'proposal': {
       const verdict = body.action === 'reject' ? 'やめておいて' : 'やって';
       answer = verdict + (t ? `（${t}）` : '');
-      message = `【提案への返事】\n提案: ${task.title}\n返事: ${verdict}${t ? `\nコメント: ${t}` : ''}`;
+      message = withAttachments(
+        `【提案への返事】\n提案: ${task.title}\n返事: ${verdict}${t ? `\nコメント: ${t}` : ''}`,
+        files,
+      );
       break;
     }
     case 'report':
       answer = t || '確認した';
-      if (t) message = `【報告への返事】\n報告: ${task.title}\n返事: ${t}`;
+      if (t || files.length) message = withAttachments(`【報告への返事】\n報告: ${task.title}\n返事: ${answer}`, files);
       break;
     case 'todo':
       answer = t || '完了';
-      if (t) message = `【ToDoについて】\nToDo: ${task.title}\n完了した。コメント: ${t}`;
+      if (t || files.length)
+        message = withAttachments(`【ToDoについて】\nToDo: ${task.title}\n完了した。${t ? `コメント: ${t}` : ''}`, files);
       break;
   }
 

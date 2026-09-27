@@ -9,6 +9,7 @@ import type {
   Settings,
   Task,
   TurnData,
+  UploadedFile,
 } from '../../shared/types.ts';
 import { loadPref, savePref } from './util.ts';
 
@@ -30,14 +31,33 @@ async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
   return data as T;
 }
 
+/** ファイルは JSON ではなく、そのままの形で送る */
+export async function uploadFile(file: File): Promise<UploadedFile> {
+  const token = getToken();
+  const body = new FormData();
+  body.append('file', file, file.name);
+  const res = await fetch('/api/uploads', {
+    method: 'POST',
+    headers: token ? { 'x-allama-token': token } : {},
+    body,
+  });
+  if (res.status === 401) throw new UnauthorizedError('合言葉が必要');
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+  return data as UploadedFile;
+}
+
 export const api = {
   state: () => req<AppState>('GET', '/api/state'),
   transcript: (id: string) => req<{ session: SessionMeta; turns: TurnData[] }>('GET', `/api/sessions/${id}/transcript`),
-  startSession: (b: { message: string; modelId?: string; cwd?: string }) => req<SessionMeta>('POST', '/api/sessions', b),
-  answer: (taskId: string, b: { action?: string; text?: string }) => req<Task>('POST', `/api/tasks/${taskId}/answer`, b),
+  startSession: (b: { message: string; modelId?: string; cwd?: string; files?: string[] }) =>
+    req<SessionMeta>('POST', '/api/sessions', b),
+  answer: (taskId: string, b: { action?: string; text?: string; files?: string[] }) =>
+    req<Task>('POST', `/api/tasks/${taskId}/answer`, b),
   stop: (id: string) => req<{ ok: boolean }>('POST', `/api/sessions/${id}/stop`),
-  sendMessage: (id: string, text: string) =>
-    req<{ result: 'started' | 'queued' }>('POST', `/api/sessions/${id}/message`, { text }),
+  sendMessage: (id: string, text: string, files?: string[]) =>
+    req<{ result: 'started' | 'queued' }>('POST', `/api/sessions/${id}/message`, { text, files }),
+  upload: uploadFile,
   memoryList: (q: string, kind: string) =>
     req<MemoryItem[]>('GET', `/api/memory/list?limit=100&q=${encodeURIComponent(q)}&kind=${encodeURIComponent(kind)}`),
   memoryItem: (id: string) => req<MemoryItem & { sourceItems: MemoryItem[] }>('GET', `/api/memory/item/${id}`),
