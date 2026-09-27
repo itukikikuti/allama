@@ -1,6 +1,7 @@
 // HTTPサーバー（Hono）。画面からの操作を受ける。
 
 import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { serve } from '@hono/node-server';
@@ -122,6 +123,27 @@ export function startHttp(app: App): void {
   api.post('/memory/consolidate', (c) => {
     void app.memory.consolidate();
     return c.json({ ok: true });
+  });
+
+  // ~/.allama/files に置いた画像を返す。タスク画面の Markdown から、そのまま画像として読める
+  api.get('/files/:name', async (c) => {
+    const name = c.req.param('name');
+    const ext = name.split('.').pop()?.toLowerCase() ?? '';
+    const types: Record<string, string> = {
+      svg: 'image/svg+xml',
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      gif: 'image/gif',
+      webp: 'image/webp',
+    };
+    if (!/^[A-Za-z0-9._-]+$/.test(name) || !types[ext]) return c.json({ error: '見られない名前' }, 400);
+    try {
+      const data = await readFile(path.join(app.config.dataDir, 'files', name));
+      return c.body(new Uint8Array(data), 200, { 'Content-Type': types[ext], 'Cache-Control': 'no-cache' });
+    } catch {
+      return c.json({ error: '無い' }, 404);
+    }
   });
 
   const root = new Hono();
