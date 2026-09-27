@@ -23,10 +23,11 @@ say "Claude Code（Claude のモデルを使うときのログイン用。allama
 npm install -g @anthropic-ai/claude-code >/dev/null
 claude --version
 
-say "Ollama（クラウドモデル用なので本体だけ入れる）"
-if [ ! -x "$PREFIX/ollama/bin/ollama" ]; then
+say "Ollama（CPU で動かす分だけ。GPU 用のライブラリは入れない）"
+if [ ! -x "$PREFIX/ollama/lib/ollama/llama-server" ]; then
   mkdir -p "$PREFIX/ollama"
-  curl -fsSL https://ollama.com/download/ollama-linux-amd64.tar.zst | tar --zstd -x -C "$PREFIX/ollama" bin/ollama
+  curl -fsSL https://ollama.com/download/ollama-linux-amd64.tar.zst |
+    tar --zstd -x -C "$PREFIX/ollama" --exclude='lib/ollama/cuda_*' --exclude='lib/ollama/rocm*' --exclude='lib/ollama/vulkan'
 fi
 ollama --version 2>/dev/null | tail -1 || true
 

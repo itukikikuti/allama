@@ -93,7 +93,7 @@ export function startHttp(app: App): void {
       return c.json({ ok: true, message: `使える（${v.length}次元）` });
     } catch (e) {
       const msg = (e as Error).message;
-      return c.json({ ok: false, message: /not found|404/.test(msg) ? 'まだ取ってきていない（「取得する」を押す）' : `使えない: ${msg}` });
+      return c.json({ ok: false, message: /model .*not found/i.test(msg) ? 'まだ取ってきていない（「取得する」を押す）' : `使えない: ${msg}` });
     }
   });
   api.post('/settings/pull', async (c) => {
