@@ -1,0 +1,15 @@
+# allama が使う Ollama（このユーザーで動かす）。deploy/install.sh が ~/.config/systemd/user/ に置く。
+
+[Unit]
+Description=Ollama (allama 用)
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/ollama/bin/ollama serve
+Restart=always
+RestartSec=3
+Environment=OLLAMA_HOST=127.0.0.1:11434
+
+[Install]
+WantedBy=default.target

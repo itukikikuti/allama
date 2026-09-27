@@ -1,4 +1,4 @@
-import type { AppState, ServerEvent, SessionMeta, Task, TurnData } from '../../shared/types.ts';
+import type { AppState, MindCommit, MindFile, ServerEvent, SessionMeta, Task, TurnData } from '../../shared/types.ts';
 import { loadPref, savePref } from './util.ts';
 
 export class UnauthorizedError extends Error {}
@@ -10,7 +10,7 @@ async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
   const token = getToken();
   const res = await fetch(url, {
     method,
-    headers: { 'content-type': 'application/json', ...(token ? { 'x-atama-token': token } : {}) },
+    headers: { 'content-type': 'application/json', ...(token ? { 'x-allama-token': token } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (res.status === 401) throw new UnauthorizedError('合言葉が必要');
@@ -25,6 +25,12 @@ export const api = {
   startSession: (b: { message: string; modelId?: string; cwd?: string }) => req<SessionMeta>('POST', '/api/sessions', b),
   answer: (taskId: string, b: { action?: string; text?: string }) => req<Task>('POST', `/api/tasks/${taskId}/answer`, b),
   stop: (id: string) => req<{ ok: boolean }>('POST', `/api/sessions/${id}/stop`),
+  sendMessage: (id: string, text: string) =>
+    req<{ result: 'started' | 'queued' }>('POST', `/api/sessions/${id}/message`, { text }),
+  mindFiles: () => req<MindFile[]>('GET', '/api/mind/files'),
+  mindFile: (path: string) => req<{ content: string }>('GET', `/api/mind/file?path=${encodeURIComponent(path)}`),
+  mindHistory: () => req<MindCommit[]>('GET', '/api/mind/history'),
+  mindCommit: (hash: string) => req<{ diff: string }>('GET', `/api/mind/commit/${hash}`),
 };
 
 type Listener = (ev: ServerEvent) => void;

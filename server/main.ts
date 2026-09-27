@@ -1,14 +1,16 @@
+import fs from 'node:fs';
 import { startHttp } from './api.ts';
 import { App } from './app.ts';
 import { loadConfig } from './config.ts';
 
 const config = loadConfig();
+fs.mkdirSync(config.defaultCwd, { recursive: true });
 const app = new App(config);
 await app.mind.init();
 app.runner.start();
 app.scheduler.start();
 startHttp(app);
 
-console.log(`[atama] 起きた: http://${config.host}:${config.port}`);
-console.log(`[atama] 記憶とデータ: ${config.dataDir}`);
-console.log(`[atama] モデル: ${config.models.map((m) => m.id).join(', ')}（既定 ${config.defaultModelId}）`);
+console.log(`[allama] 起きた: http://${config.host}:${config.port}`);
+console.log(`[allama] 記憶とデータ: ${config.dataDir}`);
+console.log(`[allama] モデル: ${config.models.map((m) => m.id).join(', ')}（既定 ${config.defaultModelId}）`);

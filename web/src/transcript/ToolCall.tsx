@@ -89,7 +89,7 @@ export function describe(call: ToolCall): Desc {
   const i = call.input ?? {};
   const mcp = call.name.match(/^mcp__(.+?)__(.+)$/);
   if (mcp) {
-    const h = mcp[1] === 'atama' ? HEAD_TOOLS[mcp[2]] : undefined;
+    const h = mcp[1] === 'allama' ? HEAD_TOOLS[mcp[2]] : undefined;
     if (h) return { icon: h[0], label: h[1], summary: h[2](i), head: true };
     return { icon: Plug, label: `${mcp[1]}: ${mcp[2]}`, summary: firstString(i) };
   }
@@ -190,7 +190,7 @@ function Detail({ call, live, renderItems }: { call: ToolCall; live: boolean; re
   const r = call.result;
   const text = r ? contentText(r.content) : '';
   const error = r?.isError ? <Output text={text || 'エラー'} /> : null;
-  const mcp = call.name.match(/^mcp__atama__(.+)$/);
+  const mcp = call.name.match(/^mcp__allama__(.+)$/);
 
   if (mcp) return <HeadDetail name={mcp[1]} input={i} resultText={text} isError={!!r?.isError} />;
 

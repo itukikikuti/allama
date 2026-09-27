@@ -1452,3 +1452,104 @@ pre.json {
     justify-content: flex-end;
   }
 }
+
+/* ---- セッションへの返信 ---- */
+
+.reply-bar {
+  position: sticky;
+  bottom: 0;
+  padding: 10px 0 calc(10px + env(safe-area-inset-bottom));
+  background: linear-gradient(to bottom, transparent, var(--bg) 30%);
+}
+
+.reply-box {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 8px 8px 8px 14px;
+  box-shadow: var(--shadow);
+}
+
+.reply-box textarea {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  font-size: 15px;
+  line-height: 1.55;
+  padding: 5px 0;
+}
+
+/* ---- 記憶のビューワー ---- */
+
+.mind-group {
+  margin-bottom: 14px;
+}
+
+.mind-dir {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 6px 2px;
+}
+
+.mind-file-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 6px 0 14px;
+}
+
+.mind-file-head h1 {
+  font-size: 17px;
+  font-weight: 650;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.seg {
+  display: flex;
+  gap: 2px;
+  background: var(--surface-2);
+  padding: 3px;
+  border-radius: 9px;
+}
+
+.seg button {
+  border: 0;
+  background: none;
+  border-radius: 7px;
+  padding: 3px 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.seg button.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.mind-doc {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+
+.mind-raw {
+  font-size: 13px;
+}
+
+.mind-diff {
+  margin-bottom: 16px;
+}

@@ -148,6 +148,12 @@ export const TOOL_DEFS: ToolDef[] = [
     inputSchema: obj({}),
   },
   {
+    name: 'restart_self',
+    description:
+      '自分の体（このシステムのソースコード）を書き換えたあと、変更を反映するために再起動する。型チェック・画面のビルド・読み込みの確認がすべて通ったときだけ再起動する（通らなければ理由を返す）。動いている手は止まらない。',
+    inputSchema: obj({ reason: str('何を変えたか（ログに残る）') }, ['reason']),
+  },
+  {
     name: 'cancel_wakeup',
     description: '目覚ましを取り消す。',
     inputSchema: obj({ wakeup_id: str('目覚ましID') }, ['wakeup_id']),

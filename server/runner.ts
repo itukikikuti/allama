@@ -193,11 +193,11 @@ export class Runner {
       JSON.stringify(
         {
           mcpServers: {
-            atama: {
+            allama: {
               type: 'stdio',
               command: process.execPath,
               args: ['--no-warnings', path.join(APP_DIR, 'server', 'mcp.ts')],
-              env: { ATAMA_URL: internalUrl(config), ATAMA_SESSION_ID: meta.id, ATAMA_TOKEN: config.authToken },
+              env: { ALLAMA_URL: internalUrl(config), ALLAMA_SESSION_ID: meta.id, ALLAMA_TOKEN: config.authToken },
             },
           },
         },
@@ -241,7 +241,7 @@ export class Runner {
           ...handEnv(process.env),
           ...(model.ollama ? ollamaEnv(config.ollamaHost, model.ollama) : {}),
           ...model.env,
-          ATAMA_SESSION_ID: meta.id,
+          ALLAMA_SESSION_ID: meta.id,
         },
         windowsHide: true,
       });

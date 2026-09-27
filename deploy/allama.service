@@ -1,0 +1,22 @@
+# systemd のユーザーサービス。deploy/install.sh が ~/.config/systemd/user/ に置く。
+# ・KillMode=process：サーバーが再起動しても、作業中の手（Claude Code）は止まらない
+# ・Restart=always：秘書が自分を書き換えて restart_self したとき、すぐに起こし直す
+
+[Unit]
+Description=allama (Claude Code を手として使う頭)
+After=network-online.target ollama.service
+Wants=ollama.service
+StartLimitIntervalSec=120
+StartLimitBurst=10
+
+[Service]
+Type=simple
+WorkingDirectory=%APP_DIR%
+ExecStart=%h/.local/node/bin/node --no-warnings server/main.ts
+Restart=always
+RestartSec=2
+KillMode=process
+Environment=PATH=%h/.local/node/bin:%h/.local/ollama/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=default.target

@@ -72,7 +72,7 @@ export function cx(...names: (string | false | null | undefined)[]): string {
 
 export function loadPref(key: string): string {
   try {
-    return localStorage.getItem(`atama:${key}`) ?? '';
+    return localStorage.getItem(`allama:${key}`) ?? '';
   } catch {
     return '';
   }
@@ -80,7 +80,7 @@ export function loadPref(key: string): string {
 
 export function savePref(key: string, value: string): void {
   try {
-    localStorage.setItem(`atama:${key}`, value);
+    localStorage.setItem(`allama:${key}`, value);
   } catch {
     // 保存できなくても困らない
   }

@@ -4,9 +4,9 @@
 import readline from 'node:readline';
 import { TOOL_DEFS } from './tool-defs.ts';
 
-const URL_BASE = process.env.ATAMA_URL ?? 'http://127.0.0.1:3170';
-const SESSION_ID = process.env.ATAMA_SESSION_ID ?? '';
-const TOKEN = process.env.ATAMA_TOKEN ?? '';
+const URL_BASE = process.env.ALLAMA_URL ?? 'http://127.0.0.1:3170';
+const SESSION_ID = process.env.ALLAMA_SESSION_ID ?? '';
+const TOKEN = process.env.ALLAMA_TOKEN ?? '';
 
 function send(msg: unknown): void {
   process.stdout.write(`${JSON.stringify(msg)}\n`);
@@ -15,7 +15,7 @@ function send(msg: unknown): void {
 async function callTool(name: string, args: unknown): Promise<{ text: string; isError?: boolean }> {
   const res = await fetch(`${URL_BASE}/api/head/call`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', ...(TOKEN ? { 'x-atama-token': TOKEN } : {}) },
+    headers: { 'content-type': 'application/json', ...(TOKEN ? { 'x-allama-token': TOKEN } : {}) },
     body: JSON.stringify({ sessionId: SESSION_ID, name, args }),
   });
   if (!res.ok) return { text: `頭のサーバーに届かなかった（HTTP ${res.status}）`, isError: true };
@@ -28,7 +28,7 @@ async function handle(msg: any): Promise<unknown> {
       return {
         protocolVersion: msg.params?.protocolVersion ?? '2025-06-18',
         capabilities: { tools: {} },
-        serverInfo: { name: 'atama', version: '0.1.0' },
+        serverInfo: { name: 'allama', version: '0.1.0' },
       };
     case 'ping':
       return {};

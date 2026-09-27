@@ -76,7 +76,7 @@ async function handle(app: App, req: http.IncomingMessage, res: http.ServerRespo
   if (!p.startsWith('/api/')) return serveStatic(res, p);
 
   const token = app.config.authToken;
-  if (token && req.headers['x-atama-token'] !== token && url.searchParams.get('token') !== token) {
+  if (token && req.headers['x-allama-token'] !== token && url.searchParams.get('token') !== token) {
     throw new HttpError(401, '合言葉が違う');
   }
 
@@ -107,6 +107,34 @@ async function handle(app: App, req: http.IncomingMessage, res: http.ServerRespo
     const s = app.store.session(m[1]);
     if (!s) throw new HttpError(404, 'セッションが見つからない');
     return sendJson(res, 200, { session: s, turns: readTurns(app.config.dataDir, s, Number(url.searchParams.get('from')) || 1) });
+  }
+
+  // セッション画面からの返信。作業中なら区切りがついたときに届く
+  m = p.match(/^\/api\/sessions\/([\w-]+)\/message$/);
+  if (method === 'POST' && m) {
+    const b = await readBody(req);
+    const text = String(b.text ?? '').trim();
+    if (!text) throw new HttpError(400, 'メッセージを書いて');
+    if (!app.store.session(m[1])) throw new HttpError(404, 'セッションが見つからない');
+    const r = app.runner.send(m[1], { text, source: 'user', at: new Date().toISOString() });
+    return sendJson(res, 200, { result: r });
+  }
+
+  // 記憶のビューワー（見るだけ）
+  if (method === 'GET' && p === '/api/mind/files') return sendJson(res, 200, app.mind.files());
+  if (method === 'GET' && p === '/api/mind/file') {
+    const content = app.mind.readSafe(url.searchParams.get('path') ?? '');
+    if (content === null) throw new HttpError(404, 'ファイルが見つからない');
+    return sendJson(res, 200, { content });
+  }
+  if (method === 'GET' && p === '/api/mind/history') {
+    return sendJson(res, 200, await app.mind.history(Number(url.searchParams.get('limit')) || 100));
+  }
+  m = p.match(/^\/api\/mind\/commit\/([0-9a-f]+)$/);
+  if (method === 'GET' && m) {
+    const diff = await app.mind.commitDiff(m[1]);
+    if (diff === null) throw new HttpError(404, 'その記録は見つからない');
+    return sendJson(res, 200, { diff });
   }
 
   m = p.match(/^\/api\/sessions\/([\w-]+)\/stop$/);

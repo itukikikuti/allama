@@ -45,7 +45,7 @@ function expandHome(p: string): string {
 }
 
 export function loadConfig(): Config {
-  const file = process.env.ATAMA_CONFIG ?? path.join(APP_DIR, 'config.json');
+  const file = process.env.ALLAMA_CONFIG ?? path.join(APP_DIR, 'config.json');
   const raw = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
   const models: ModelConfig[] = raw.models?.length
     ? raw.models
@@ -53,7 +53,7 @@ export function loadConfig(): Config {
   return {
     host: raw.host ?? '127.0.0.1',
     port: raw.port ?? 3170,
-    dataDir: path.resolve(APP_DIR, expandHome(raw.dataDir ?? '~/.atama')),
+    dataDir: path.resolve(APP_DIR, expandHome(raw.dataDir ?? '~/.allama')),
     defaultCwd: path.resolve(APP_DIR, expandHome(raw.defaultCwd ?? '~')),
     timezone: raw.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
     ownerName: raw.ownerName ?? 'ユーザー',

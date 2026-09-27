@@ -98,3 +98,17 @@ export type ServerEvent =
   | { type: 'state'; state: AppState }
   | { type: 'turn-start'; sessionId: string; turn: number; input: TurnInput }
   | { type: 'session-event'; sessionId: string; turn: number; event: any };
+
+export interface MindFile {
+  path: string;
+  size: number;
+  mtime: string;
+}
+
+export interface MindCommit {
+  hash: string;
+  date: string;
+  message: string;
+  /** status: A=追加 M=変更 D=削除 R=名前変更 */
+  files: { status: string; path: string }[];
+}

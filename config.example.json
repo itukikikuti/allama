@@ -2,7 +2,7 @@
   "ownerName": "ユーザー",
   "host": "127.0.0.1",
   "port": 3170,
-  "dataDir": "~/.atama",
+  "dataDir": "~/.allama",
   "defaultCwd": "~",
   "timezone": "Asia/Tokyo",
   "ollamaHost": "http://127.0.0.1:11434",

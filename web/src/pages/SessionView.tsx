@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ChevronLeft, CircleAlert, Hand, Loader2, MessageCircleQuestion, Square } from 'lucide-react';
+import { ArrowUp, ChevronLeft, CircleAlert, Hand, Loader2, MessageCircleQuestion, Square } from 'lucide-react';
 import type { AppState, ServerEvent, TurnData } from '../../../shared/types.ts';
 import { api, onServerEvent } from '../api.ts';
 import { Transcript } from '../transcript/Transcript.tsx';
@@ -157,6 +157,61 @@ export function SessionView({ id, state }: { id: string; state: AppState }) {
         </div>
       )}
       {meta.queue.length > 0 && <div className="note">このあと届くメッセージが{meta.queue.length}件ある</div>}
+
+      <ReplyBar sessionId={meta.id} running={running} />
+    </div>
+  );
+}
+
+/** セッションへの返信。作業中なら、区切りがついたときに届く */
+function ReplyBar({ sessionId, running }: { sessionId: string; running: boolean }) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight + 2, 240)}px`;
+  }, [text]);
+
+  const send = async () => {
+    if (!text.trim() || busy) return;
+    setBusy(true);
+    setErr('');
+    try {
+      await api.sendMessage(sessionId, text);
+      setText('');
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="reply-bar">
+      <div className="reply-box">
+        <textarea
+          ref={ref}
+          value={text}
+          rows={1}
+          placeholder={running ? '返信（作業の区切りで届く）' : 'このセッションに返信'}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+              e.preventDefault();
+              void send();
+            }
+          }}
+        />
+        <button type="button" className="send-btn" disabled={!text.trim() || busy} onClick={send} title="送る（Ctrl+Enter）">
+          {busy ? <Loader2 className="spin" size={16} /> : <ArrowUp size={16} />}
+        </button>
+      </div>
+      {err && <div className="form-error">{err}</div>}
     </div>
   );
 }
