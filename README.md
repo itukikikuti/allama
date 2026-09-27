@@ -13,7 +13,7 @@ Claude Code という「手」を使いこなす「頭」。PCに住んでいる
 - **タスク**：頼みごとを書いて新しい手を動かす（モデルを選べる）。秘書からの質問・提案・報告・あなたのToDoに返事をする。
 - **セッション**：手の一覧と、それぞれの中身（Claude Desktop のように、思考・ツール・差分・サブエージェントを表示）。下の欄からそのセッションに返信できる（作業中なら区切りで届く）。
 - **記憶**：記憶フォルダの中身と、その変化の記録（git）を見る。見るだけ。
-- **設定**（右上の歯車）：Ollama の接続先、使うモデル（Ollama / Claude）、既定のモデル、あなたの呼び名。接続やモデルが使えるかをその場で確かめられる。保存するとすぐ反映される。
+- **設定**（右上の歯車）：Ollama の接続先、使うモデル（Ollama / Claude）、既定のモデル。接続やモデルが使えるかをその場で確かめられる。保存するとすぐ反映される。
 
 ## 入れ方（Ubuntu・sudo 不要）
 
@@ -21,7 +21,7 @@ Claude Code という「手」を使いこなす「頭」。PCに住んでいる
 git clone https://github.com/itukikikuti/allama.git ~/allama
 cd ~/allama
 ./deploy/install.sh        # Node.js 24・Claude Code・Ollama を ~/.local に入れ、systemd で常駐させる
-nano config.json           # 名前やモデルを自分用に（書き換えたら systemctl --user restart allama）
+nano config.json           # 必要なら（モデルなどは画面の設定からも変えられる）
 ollama signin              # Ollama のクラウドモデルを使うなら、初回だけ
 ```
 
@@ -35,14 +35,13 @@ ollama signin              # Ollama のクラウドモデルを使うなら、�
 
 ### 自分を改良させるには
 
-秘書は `~/allama` のソースを書き換え、`npm run check`（型チェック・画面のビルド・読み込みの確認）が通ったら、`restartCommand`（既定 `systemctl --user restart allama`）で自分を再起動して反映する。再起動しても作業中の手は止まらない。
+秘書は `~/allama` のソースを書き換え、`npm run restart` で自分を再起動して反映する。これは型チェック・画面のビルド・読み込みの確認（`npm run check`）が通ったときだけ `systemctl --user restart allama` する。再起動しても作業中の手は止まらない。
 コミットしてプッシュするには、`~/allama` から GitHub に書き込めるようにしておく。
 
 ## 設定（config.json）
 
 | 項目 | 意味 |
 | --- | --- |
-| `ownerName` | 秘書があなたを呼ぶ名前 |
 | `host` / `port` | 画面を開く場所（既定 `127.0.0.1:3170`） |
 | `dataDir` | 記憶とデータの置き場所（既定 `~/.allama`） |
 | `defaultCwd` | 手の既定の作業フォルダ |
@@ -51,7 +50,7 @@ ollama signin              # Ollama のクラウドモデルを使うなら、�
 | `ollamaHost` | Ollama の場所（既定 `http://127.0.0.1:11434`） |
 | `authToken` | 画面の合言葉（空なら無し） |
 | `fallbackPatrolHours` | 予定が1つも無いときに入れる見回りまでの時間 |
-| `restartCommand` | 秘書が自分を再起動するコマンド（既定 `systemctl --user restart allama`） |
+| `restartCommand` | 秘書が自分を再起動するコマンド（既定 `npm run restart`） |
 
 モデルの例：
 

@@ -123,7 +123,6 @@ export interface ModelSetting {
 }
 
 export interface Settings {
-  ownerName: string;
   ollamaHost: string;
   models: ModelSetting[];
   defaultModelId: string;

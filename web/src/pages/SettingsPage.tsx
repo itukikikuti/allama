@@ -53,7 +53,6 @@ function Result({ r }: { r?: CheckResult | 'busy' }) {
 
 export function SettingsPage() {
   const [loaded, setLoaded] = useState<Settings | null>(null);
-  const [ownerName, setOwnerName] = useState('');
   const [host, setHost] = useState('');
   const [rows, setRows] = useState<Row[]>([]);
   const [defaultId, setDefaultId] = useState('');
@@ -64,7 +63,6 @@ export function SettingsPage() {
 
   const apply = (s: Settings) => {
     setLoaded(s);
-    setOwnerName(s.ownerName);
     setHost(s.ollamaHost);
     setRows(s.models.map(toRow));
     setDefaultId(s.defaultModelId);
@@ -102,7 +100,7 @@ export function SettingsPage() {
     setSaving(true);
     setMsg(null);
     try {
-      apply(await api.saveSettings({ ownerName, ollamaHost: host, models: rows.map(toModel), defaultModelId: defaultId }));
+      apply(await api.saveSettings({ ollamaHost: host, models: rows.map(toModel), defaultModelId: defaultId }));
       setModelChecks({});
       setMsg({ ok: true, text: '保存した。次に動く手から使われる。' });
     } catch (e) {
@@ -116,14 +114,6 @@ export function SettingsPage() {
 
   return (
     <div className="page settings">
-      <h2>あなた</h2>
-      <div className="card">
-        <label className="field">
-          <span>秘書があなたを呼ぶ名前</span>
-          <input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} />
-        </label>
-      </div>
-
       <h2>Ollama</h2>
       <div className="card">
         <label className="field">

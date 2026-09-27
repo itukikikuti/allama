@@ -29,7 +29,6 @@ export interface Config {
   dataDir: string;
   defaultCwd: string;
   timezone: string;
-  ownerName: string;
   models: ModelConfig[];
   defaultModelId: string;
   authToken: string;
@@ -38,13 +37,12 @@ export interface Config {
   /** 目覚ましが1つも無いとき、この時間後に見回りを入れる */
   fallbackPatrolHours: number;
   extraClaudeArgs: string[];
-  /** 自分を再起動するコマンド（本人に教える） */
+  /** 自分を再起動するコマンド（本人に教える）。既定は確認してから再起動する npm run restart */
   restartCommand: string;
 }
 
 /** 設定画面で変えられる項目 */
 export interface Settings {
-  ownerName: string;
   ollamaHost: string;
   models: ModelConfig[];
   defaultModelId: string;
@@ -72,19 +70,18 @@ export function loadConfig(): Config {
     dataDir: path.resolve(APP_DIR, expandHome(raw.dataDir ?? '~/.allama')),
     defaultCwd: path.resolve(APP_DIR, expandHome(raw.defaultCwd ?? '~')),
     timezone: raw.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
-    ownerName: raw.ownerName ?? 'ユーザー',
     models,
     defaultModelId: raw.defaultModelId ?? models[0].id,
     authToken: raw.authToken ?? '',
     ollamaHost: raw.ollamaHost ?? process.env.OLLAMA_HOST ?? 'http://127.0.0.1:11434',
     fallbackPatrolHours: raw.fallbackPatrolHours ?? 6,
     extraClaudeArgs: raw.extraClaudeArgs ?? [],
-    restartCommand: raw.restartCommand ?? 'systemctl --user restart allama',
+    restartCommand: raw.restartCommand ?? 'npm run restart',
   };
 }
 
 export function getSettings(cfg: Config): Settings {
-  return { ownerName: cfg.ownerName, ollamaHost: cfg.ollamaHost, models: cfg.models, defaultModelId: cfg.defaultModelId };
+  return { ollamaHost: cfg.ollamaHost, models: cfg.models, defaultModelId: cfg.defaultModelId };
 }
 
 /** 設定画面からの変更を確かめて config.json に書き、動いている設定にもすぐ反映する */
@@ -100,12 +97,12 @@ export function saveSettings(cfg: Config, s: Settings): Settings {
   }
   if (!ids.has(s.defaultModelId)) throw new Error('既定のモデルが一覧に無い');
   const next: Settings = {
-    ownerName: s.ownerName?.trim() || 'ユーザー',
     ollamaHost: s.ollamaHost?.trim() || 'http://127.0.0.1:11434',
     models,
     defaultModelId: s.defaultModelId,
   };
   const raw = { ...readRaw(), ...next };
+  delete raw.ownerName; // 呼び名は記憶に持つ（古い設定から消す）
   const file = configFile();
   const tmp = `${file}.tmp`;
   fs.writeFileSync(tmp, `${JSON.stringify(raw, null, 2)}

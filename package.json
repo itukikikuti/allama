@@ -13,7 +13,8 @@
     "dev:web": "vite --config web/vite.config.ts",
     "build": "vite build --config web/vite.config.ts",
     "typecheck": "tsc -p tsconfig.json && tsc -p web/tsconfig.json",
-    "check": "npm run typecheck && npm run build && node --no-warnings --input-type=module -e \"await import('./server/api.ts'); await import('./server/app.ts')\""
+    "check": "npm run typecheck && npm run build && node --no-warnings --input-type=module -e \"await import('./server/api.ts'); await import('./server/app.ts')\"",
+    "restart": "npm run check && systemctl --user restart allama"
   },
   "dependencies": {
     "diff": "^9.0.0",
