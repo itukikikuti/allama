@@ -1,6 +1,6 @@
 # systemd のユーザーサービス。deploy/install.sh が ~/.config/systemd/user/ に置く。
 # ・KillMode=process：サーバーが再起動しても、作業中の手（Claude Code）は止まらない
-# ・Restart=always：秘書が自分を書き換えて restart_self したとき、すぐに起こし直す
+# ・Restart=always：落ちたときや、秘書が自分を書き換えて再起動したときに、すぐ起こし直す
 
 [Unit]
 Description=allama (Claude Code を手として使う頭)
