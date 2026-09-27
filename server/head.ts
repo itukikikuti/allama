@@ -1,6 +1,8 @@
 // 頭：どの手（セッション）にも、同じ「自分」として動くための前提と記憶を渡す。
 // 性格や細かい振る舞いはここでは決めない。本人が記憶フォルダの中で育てていく。
 
+import fs from 'node:fs';
+import os from 'node:os';
 import type { SessionMeta, TurnInput } from '../shared/types.ts';
 import type { App } from './app.ts';
 import { APP_DIR } from './config.ts';
@@ -10,6 +12,12 @@ export const PATROL_PROMPT = `見回りの時間。
 - まだ記憶に整理していない手があれば、記録を読み返して日記などに整理する
 - タスク画面やToDoの期限、見張っているものを確認し、必要なら動く・提案する・知らせる
 - 最後に、次の見回りを schedule_wakeup で予定する（いつ起きるかは状況に合わせて自分で決める）`;
+
+/** 体が今どこで動いているか（記憶が古くても、ここが今の事実） */
+function whereAmI(): string {
+  const inContainer = fs.existsSync('/.dockerenv') || fs.existsSync('/run/.containerenv');
+  return `${os.hostname()}（${os.type()} ${os.release()}、ユーザー ${os.userInfo().username}、${inContainer ? 'コンテナの中' : 'ホストで直接'}）`;
+}
 
 const TRIGGER_TEXT: Record<string, string> = {
   user: 'タスク画面から頼まれた',
@@ -93,6 +101,7 @@ ${owner}との窓口は2つある。
 # 今の状況
 
 現在時刻: ${t(new Date().toISOString())}（${tz}）
+体が動いている場所: ${whereAmI()}
 この手: 「${meta.title}」 id=${meta.id} / ターン${turn} / モデル: ${model?.label ?? meta.modelId} / 作業フォルダ: ${meta.cwd}
 始まったきっかけ: ${TRIGGER_TEXT[meta.trigger] ?? meta.trigger}${meta.parentId ? `（「${titleOf(meta.parentId)}」id=${meta.parentId} から）` : ''}
 このターンのきっかけ: ${input.source}
