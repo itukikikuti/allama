@@ -1,4 +1,4 @@
-// 頭（秘書本人）が手（Claude Code のセッション）から使う道具の定義。
+// セッション（Claude Code）から使う、この仕組みの道具の定義。
 // MCPサーバー（mcp.ts）とサーバー本体（tools.ts）の両方から読む。
 
 export interface ToolDef {
@@ -43,7 +43,7 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: 'add_user_todo',
     description:
-      'ユーザー本人がやるべきこと（買い物、手続きなど、あなたには代われないこと）を、タスク画面の「あなたのToDo」に載せる。あなた自身の作業の段取りには使わない（それはタスク画面ではなく、自分の手の中で管理する）。',
+      'ユーザー本人がやるべきこと（買い物、手続きなど）を、タスク画面の「あなたのToDo」に載せる。セッション自身の作業の段取りには使わない。',
     inputSchema: obj(
       { title: str('やること'), detail: str('補足'), due: str('期限（ISO 8601。例: 2026-10-01T18:00:00+09:00）') },
       ['title'],
@@ -60,10 +60,10 @@ export const TOOL_DEFS: ToolDef[] = [
     inputSchema: obj({ task_id: str('タスクID'), note: str('閉じる理由（任意）') }, ['task_id']),
   },
 
-  // ---- 自分の手（セッション）について ----
+  // ---- セッション ----
   {
     name: 'set_activity',
-    description: '「今やっていること」を一言で書く。他の手（並行して動いているセッション）がこれを見て、あなたの状況を知る。',
+    description: '「今やっていること」を一言で書く。並行して動いている他のセッションがこれを見られる。',
     inputSchema: obj({ text: str('今やっていること') }, ['text']),
   },
   {
@@ -73,15 +73,15 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'list_sessions',
-    description: '自分の手（セッション）の一覧と、それぞれが今やっていることを見る。',
+    description: 'セッションの一覧と、それぞれが今やっていることを見る。',
     inputSchema: obj({ limit: { type: 'number', description: '最近のものから何件（既定30）' } }),
   },
   {
     name: 'start_session',
-    description: '新しい手（別のClaude Codeセッション）を出して、並行して作業を進める。その手もあなた自身で、同じ記憶を持つ。',
+    description: '新しいセッション（別の Claude Code）を始めて、並行して作業を進める。同じ記憶フォルダを使う。',
     inputSchema: obj(
       {
-        prompt: str('その手にやってほしいこと'),
+        prompt: str('そのセッションに渡すメッセージ'),
         title: str('題名'),
         cwd: str('作業フォルダ（絶対パス。省略時は既定）'),
         model_id: str('モデルID（list_models で確認。省略時は既定）'),
@@ -91,7 +91,7 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'send_to_session',
-    description: '別の手（セッション）にメッセージを送る。作業中なら、区切りがついたときに届く。',
+    description: '別のセッションにメッセージを送る。作業中なら、区切りがついたときに届く。',
     inputSchema: obj({ session_id: str('セッションID'), message: str('メッセージ') }, ['session_id', 'message']),
   },
   {
@@ -104,7 +104,7 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: 'recall',
     description:
-      '過去を思い出す。これまでの全セッションの記録と記憶フォルダから、キーワード（空白区切りで全部を含むもの）を探す。',
+      'これまでの全セッションの記録と記憶フォルダから、キーワード（空白区切り）を探す。多く含む箇所ほど上に出る。',
     inputSchema: obj({ query: str('キーワード'), limit: { type: 'number', description: '最大件数（既定20）' } }, ['query']),
   },
   {
@@ -121,7 +121,7 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'mark_digested',
-    description: 'セッションの出来事を記憶フォルダ（日記など）に整理し終えたら、そのセッションを「整理済み」にする。',
+    description: 'セッションに印を付ける。印の無いセッションは、毎回のプロンプトに一覧が載る（記憶フォルダに書き残したかどうかの目印などに使える）。',
     inputSchema: obj({ session_ids: { type: 'array', items: { type: 'string' } } }, ['session_ids']),
   },
 
@@ -129,15 +129,15 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: 'schedule_wakeup',
     description:
-      '指定の時刻に自分を起こす。見回り、リマインド、サイトの見張りなどに使う。session_id を指定するとそのセッションの続きとして、省略すると新しい手として起きる。',
+      '指定の時刻に起こしてもらう。session_id を指定するとそのセッションの続きとして、省略すると新しいセッションとして起きる。',
     inputSchema: obj(
       {
-        prompt: str('起きたときにやること'),
+        prompt: str('起きたときに届くメッセージ'),
         at: str('時刻（ISO 8601）'),
         in_minutes: { type: 'number', description: '今から何分後か（at の代わり）' },
         every_minutes: { type: 'number', description: '繰り返す間隔（分）。省略すると1回きり' },
         session_id: str('続きとして起こすセッション（任意）'),
-        model_id: str('新しい手を出すときのモデル（任意）'),
+        model_id: str('新しいセッションのモデル（任意）'),
       },
       ['prompt'],
     ),
@@ -150,7 +150,7 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: 'restart_self',
     description:
-      '自分の体（このシステムのソースコード）を書き換えたあと、変更を反映するために再起動する。型チェック・画面のビルド・読み込みの確認がすべて通ったときだけ再起動する（通らなければ理由を返す）。動いている手は止まらない。',
+      'この仕組みのソースコードを書き換えたあと、変更を反映するために仕組みを再起動する。型チェック・画面のビルド・読み込みの確認がすべて通ったときだけ再起動する（通らなければ理由を返す）。動いているセッションは止まらない。',
     inputSchema: obj({ reason: str('何を変えたか（ログに残る）') }, ['reason']),
   },
   {

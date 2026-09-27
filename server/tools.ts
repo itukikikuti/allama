@@ -108,21 +108,21 @@ export async function callTool(app: App, sessionId: string, name: string, a: any
     }
     case 'start_session': {
       const s = runner.createSession({
-        message: `【「${me.title}」（id=${me.id}）から頼まれた】\n${a.prompt}`,
+        message: `【セッション「${me.title}」（id=${me.id}）から】\n${a.prompt}`,
         title: a.title,
         cwd: a.cwd,
         modelId: a.model_id,
         trigger: 'session',
         parentId: me.id,
       });
-      return `新しい手を出した（session_id=${s.id}、題名「${s.title}」）。`;
+      return `新しいセッションを始めた（session_id=${s.id}、題名「${s.title}」）。`;
     }
     case 'send_to_session': {
       const target = store.session(a.session_id);
       if (!target) throw new Error(`セッションが見つからない: ${a.session_id}`);
       if (target.id === me.id) throw new Error('自分自身には送れない');
       const r = runner.send(target.id, {
-        text: `【別の手「${me.title}」（id=${me.id}）から】\n${a.message}`,
+        text: `【別のセッション「${me.title}」（id=${me.id}）から】\n${a.message}`,
         source: 'session',
         at: nowIso(),
         fromSessionId: me.id,

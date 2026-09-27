@@ -1,5 +1,5 @@
-// 記憶フォルダ（頭の中）の管理。中身の整理の仕方は本人が決める。
-// ここでは、最初の種まき・バックアップ（git）・読み出し・検索だけを受け持つ。
+// 記憶フォルダの管理。中身の書き方は本人が決める（最初は空の README.md だけ）。
+// ここでは、最初の種まき・git への記録・読み出し・検索だけを受け持つ。
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -42,7 +42,6 @@ export class Mind {
     fs.mkdirSync(this.dir, { recursive: true });
     const empty = fs.readdirSync(this.dir).filter((f) => f !== '.git').length === 0;
     if (empty) fs.cpSync(path.join(APP_DIR, 'mind-seed'), this.dir, { recursive: true });
-    fs.mkdirSync(path.join(this.dir, 'journal'), { recursive: true });
     if (!fs.existsSync(path.join(this.dir, '.git'))) {
       try {
         await git(this.dir, ['init', '-q']);
@@ -121,30 +120,6 @@ export class Mind {
     if (!this.gitOk || !/^[0-9a-f]{4,40}$/.test(hash)) return null;
     const r = await git(this.dir, ['show', '--format=', '--patch', '--no-color', '-M', hash]);
     return r.code === 0 ? r.stdout : null;
-  }
-
-  /** 最近の日記を新しい順に集め、古い順に並べて返す */
-  recentJournal(maxChars: number): string {
-    const dir = path.join(this.dir, 'journal');
-    let files: string[] = [];
-    try {
-      files = fs.readdirSync(dir).filter((f) => f.endsWith('.md')).sort().reverse();
-    } catch {
-      return '';
-    }
-    const parts: string[] = [];
-    let total = 0;
-    for (const f of files) {
-      const text = readText(path.join(dir, f)).trim();
-      if (!text) continue;
-      if (total + text.length > maxChars) {
-        if (parts.length === 0) parts.push(`### ${f}\n…${text.slice(-maxChars)}`);
-        break;
-      }
-      parts.push(`### ${f}\n${text}`);
-      total += text.length;
-    }
-    return parts.reverse().join('\n\n');
   }
 
   listFiles(limit = 200): string[] {
