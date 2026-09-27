@@ -154,11 +154,14 @@ export function createTools(app: App, sessionId: string) {
           model_id: z.string().optional().describe('新しいセッションのモデル（任意）'),
         },
         async (a) => {
-          if (!a.at && !a.in_minutes) return fail('at か in_minutes のどちらかが必要');
+          if (!a.at === !a.in_minutes) return fail('at か in_minutes のどちらか一方だけを指定する');
           if (a.session_id && !store.session(a.session_id)) return fail(`セッションが見つからない: ${a.session_id}`);
+          const at = a.at ? parseTime(a.at)! : new Date(Date.now() + a.in_minutes! * 60_000).toISOString();
+          // 過去の時刻だとすぐに鳴ってしまう。時刻の計算違いのことが多いので、今の時刻を添えて返す
+          if (Date.parse(at) < Date.now() - 60_000) return fail(`過去の時刻になっている: ${t(at)}（今は ${t(nowIso())}）`);
           const w = store.addWakeup({
             id: shortId(),
-            at: a.at ? parseTime(a.at)! : new Date(Date.now() + a.in_minutes! * 60_000).toISOString(),
+            at,
             prompt: a.prompt,
             everyMinutes: a.every_minutes,
             sessionId: a.session_id ? store.session(a.session_id)!.id : undefined,

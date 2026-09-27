@@ -81,6 +81,13 @@ export class Runner {
       // サーバーが止まったときに動いていたターンは、そこで途切れている
       if (s.status === 'running') store.updateSession(s.id, { status: 'error', lastError: 'サーバーの再起動で中断された' });
     }
+    // 再起動を待つ間に届いたメッセージ（目覚ましなど）を、ここで渡す
+    for (const s of store.sessions) {
+      const queued = s.queue;
+      if (!queued.length) continue;
+      store.updateSession(s.id, { queue: [] });
+      this.startTurn(s, mergeInputs(queued));
+    }
   }
 
   createSession(opts: CreateSessionOptions): SessionMeta {
@@ -139,6 +146,11 @@ export class Runner {
 
   private startTurn(meta: SessionMeta, input: TurnInput): void {
     const { config, store } = this.app;
+    // 再起動が決まったあとは新しいターンを始めない（途中で切れてしまう）。待たせて、起き直してから渡す
+    if (this.restartReason !== null) {
+      store.updateSession(meta.id, { queue: [...(store.session(meta.id)?.queue ?? []), input] });
+      return;
+    }
     const turn = meta.turns + 1;
     fs.mkdirSync(sessionDir(config.dataDir, meta.id), { recursive: true });
     fs.writeFileSync(turnFile(config.dataDir, meta.id, turn, 'in.json'), JSON.stringify(input, null, 2));
