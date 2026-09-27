@@ -63,6 +63,21 @@ ollama signin              # Ollama のクラウドモデルを使うなら、�
 - セッションは許可を求めずに動く。**root では動かさない**。
 - 同じネットワークの誰でも開けるので、家の外には出さない。合言葉をかけるなら `config.json` の `authToken`。
 
+## 入れ方（Windows・管理者不要）
+
+```powershell
+git clone https://github.com/itukikikuti/allama.git $env:USERPROFILE\allama
+cd $env:USERPROFILE\allama
+.\deploy\install.ps1        # リリースの .exe を %LOCALAPPDATA%\allama に置き、初回の npm ci までやる
+```
+
+- 画面は `allama.exe` の窓に出る。トレイに常駐し、閉じても裏で動き続ける（終了はトレイの「終了」から）
+- **Linux の systemd がやっていたことは、この窓がやる**：落ちたら起こし直す、`restart_self` の受け皿になる、すぐ落ちる失敗が続いたら間隔を空ける
+- Node.js はアプリに同梱のものを使う（本体は Node 24 で動く）。Claude Code も本体の依存として、win32 版の `claude.exe` ごと入る
+- Git for Windows と Ollama は winget で入れる（既にあればそのまま）。Git が無いと Bash 道具が使えず、Ollama が無いと記憶の埋め込みが働かない
+- ログ：`%APPDATA%\allama\allama.log`、記憶：`%USERPROFILE%\.allama`
+- 窓は [desktop/](desktop/)。Windows の `.exe` を組むには Windows か wine が要るので、組むのは GitHub Actions の `windows` ワークフロー（`desktop/` で `npm run build`）
+
 ### 自分を改良させるには
 
 セッションは `~/allama` のソースを書き換え、`restart_self` で反映する。型チェック・画面のビルド・読み込みの確認が通ったときだけ、動いているセッションが区切りに来たところで再起動する。人が手で反映するときは `npm run restart`。

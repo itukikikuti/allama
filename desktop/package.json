@@ -1,0 +1,20 @@
+{
+  "name": "allama-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "allama の窓（Electron）。本体は resources/app で動き、この窓が見張る",
+  "author": "itukikikuti",
+  "license": "MIT",
+  "type": "module",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "icon": "node tools/make-icon.mjs",
+    "node": "node tools/fetch-node.mjs",
+    "build": "npm run icon && npm run node && electron-builder --win --config electron-builder.yml"
+  },
+  "devDependencies": {
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3"
+  }
+}

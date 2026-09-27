@@ -2,3 +2,6 @@ node_modules/
 web/dist/
 /config.json
 .dev-data/
+# Windows の .exe を組むときに作るもの（desktop/tools/fetch-node.mjs が持ってくる）
+/vendor/
+/dist-desktop/

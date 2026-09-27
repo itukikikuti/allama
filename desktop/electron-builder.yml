@@ -1,0 +1,65 @@
+# Electron のアプリを Windows の .exe に組む設定。desktop/ で `npm run build` すると ../dist-desktop に出来る。
+#
+# 同梱するもの:
+#   resources/app  … allama の本体（server/ shared/ web/ package.json）。node_modules は初回に npm ci で入れる
+#   resources/node … 本体を動かす Node 24（win-x64）。Electron 自身の node は使わない
+#
+# 秘書が自分の体を書き換えて再起動できるよう、本体は asar の外（extraResources）に置く。
+
+appId: com.itukikikuti.allama
+productName: allama
+copyright: itukikikuti
+
+directories:
+  output: ../dist-desktop
+  buildResources: build
+
+files:
+  - main.js
+  - server-process.js
+  - loading.html
+  - package.json
+  - build/icon.png
+
+extraResources:
+  - from: ../server
+    to: app/server
+  - from: ../shared
+    to: app/shared
+  # web/dist（画面）と、restart_self の型チェック・ビルドに要る web/tsconfig.json・vite.config.ts
+  - from: ../web
+    to: app/web
+    filter:
+      - "**/*"
+      - "!node_modules/**"
+  - from: ../tsconfig.json
+    to: app/tsconfig.json
+  - from: ../package.json
+    to: app/package.json
+  - from: ../package-lock.json
+    to: app/package-lock.json
+  - from: ../config.example.json
+    to: app/config.example.json
+  - from: ../vendor/node
+    to: node
+
+win:
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: zip
+      arch: [x64]
+
+# 入れる場所は人ごと（管理者不要）。config.json と node_modules を後から書ける場所に要る
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: allama
+  artifactName: allama-${version}-win-${arch}-setup.${ext}
+
+# zip 版（インストーラを使わず、好きな場所に置きたいとき）
+artifactName: allama-${version}-win-${arch}.${ext}
