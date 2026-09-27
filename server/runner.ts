@@ -8,6 +8,7 @@ import type { InputSource, SessionMeta, SessionStatus, Trigger, TurnInput } from
 import type { App } from './app.ts';
 import { ollamaEnv } from './config.ts';
 import { buildSystemPrompt } from './head.ts';
+import { stopNudge } from './hooks.ts';
 import { createTools } from './tools.ts';
 import { readTurn, readTurns, sessionDir, turnFile, turnsToText } from './transcript.ts';
 import { firstLine, newId, nowIso } from './util.ts';
@@ -173,6 +174,8 @@ export class Runner {
           permissionMode: 'bypassPermissions',
           allowDangerouslySkipPermissions: true,
           disallowedTools: DISALLOWED_TOOLS,
+          // ターンの終わりに一度だけ止めて、届け忘れが無いか確かめさせる
+          hooks: stopNudge(meta.id),
           settingSources: ['user', 'project', 'local'],
           // 記憶はこの仕組みが担う。Claude Code 自身の自動メモリ（Markdown のメモ）とその整理は使わない
           settings: { autoMemoryEnabled: false, autoDreamEnabled: false },
