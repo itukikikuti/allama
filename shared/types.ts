@@ -112,3 +112,24 @@ export interface MindCommit {
   /** status: A=追加 M=変更 D=削除 R=名前変更 */
   files: { status: string; path: string }[];
 }
+
+/** 設定画面で扱うモデル（config.json の models の1件） */
+export interface ModelSetting {
+  id: string;
+  label: string;
+  ollama?: string;
+  command?: string[];
+  env?: Record<string, string>;
+}
+
+export interface Settings {
+  ownerName: string;
+  ollamaHost: string;
+  models: ModelSetting[];
+  defaultModelId: string;
+}
+
+export interface CheckResult {
+  ok: boolean;
+  message: string;
+}

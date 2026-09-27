@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import type { App } from './app.ts';
-import { APP_DIR } from './config.ts';
+import { APP_DIR, getSettings, saveSettings } from './config.ts';
+import { checkModel, checkOllama } from './providers.ts';
 import { readTurns } from './transcript.ts';
 import { answerTask, callTool } from './tools.ts';
 
@@ -118,6 +119,27 @@ async function handle(app: App, req: http.IncomingMessage, res: http.ServerRespo
     if (!app.store.session(m[1])) throw new HttpError(404, 'セッションが見つからない');
     const r = app.runner.send(m[1], { text, source: 'user', at: new Date().toISOString() });
     return sendJson(res, 200, { result: r });
+  }
+
+  // 設定画面
+  if (method === 'GET' && p === '/api/settings') return sendJson(res, 200, getSettings(app.config));
+  if (method === 'PUT' && p === '/api/settings') {
+    const b = await readBody(req);
+    try {
+      const s = saveSettings(app.config, b);
+      app.touch();
+      return sendJson(res, 200, s);
+    } catch (e) {
+      throw new HttpError(400, (e as Error).message);
+    }
+  }
+  if (method === 'POST' && p === '/api/settings/check-ollama') {
+    const b = await readBody(req);
+    return sendJson(res, 200, await checkOllama(String(b.host ?? app.config.ollamaHost)));
+  }
+  if (method === 'POST' && p === '/api/settings/check-model') {
+    const b = await readBody(req);
+    return sendJson(res, 200, await checkModel(b.model ?? {}, String(b.host ?? app.config.ollamaHost)));
   }
 
   // 記憶のビューワー（見るだけ）

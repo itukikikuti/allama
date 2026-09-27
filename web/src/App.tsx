@@ -3,6 +3,8 @@ import type { AppState } from '../../shared/types.ts';
 import { UnauthorizedError, api, connectEvents, onServerEvent, setToken } from './api.ts';
 import { MindPage, parseMindRoute, type MindRoute } from './pages/MindPage.tsx';
 import { SessionView } from './pages/SessionView.tsx';
+import { SettingsPage } from './pages/SettingsPage.tsx';
+import { Settings as SettingsIcon } from 'lucide-react';
 import { SessionsPage } from './pages/SessionsPage.tsx';
 import { TasksPage } from './pages/TasksPage.tsx';
 import { cx } from './util.ts';
@@ -21,13 +23,15 @@ type Route =
   | { name: 'tasks' }
   | { name: 'sessions' }
   | { name: 'session'; id: string }
-  | { name: 'mind'; mind: MindRoute };
+  | { name: 'mind'; mind: MindRoute }
+  | { name: 'settings' };
 
 function parseRoute(hash: string): Route {
   const m = hash.match(/^#\/sessions\/([\w-]+)/);
   if (m) return { name: 'session', id: m[1] };
   if (hash.startsWith('#/sessions')) return { name: 'sessions' };
   if (hash.startsWith('#/mind')) return { name: 'mind', mind: parseMindRoute(hash) };
+  if (hash.startsWith('#/settings')) return { name: 'settings' };
   return { name: 'tasks' };
 }
 
@@ -119,6 +123,9 @@ export function App() {
               記憶
             </a>
           </nav>
+          <a href="#/settings" className={cx('icon-btn', route.name === 'settings' && 'active')} title="設定">
+            <SettingsIcon size={17} />
+          </a>
         </div>
       </header>
       <main>
@@ -126,6 +133,7 @@ export function App() {
         {route.name === 'sessions' && <SessionsPage state={state} />}
         {route.name === 'session' && <SessionView key={route.id} id={route.id} state={state} />}
         {route.name === 'mind' && <MindPage route={route.mind} />}
+        {route.name === 'settings' && <SettingsPage />}
       </main>
     </div>
   );

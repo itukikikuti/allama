@@ -1,4 +1,15 @@
-import type { AppState, MindCommit, MindFile, ServerEvent, SessionMeta, Task, TurnData } from '../../shared/types.ts';
+import type {
+  AppState,
+  CheckResult,
+  MindCommit,
+  MindFile,
+  ModelSetting,
+  ServerEvent,
+  SessionMeta,
+  Settings,
+  Task,
+  TurnData,
+} from '../../shared/types.ts';
 import { loadPref, savePref } from './util.ts';
 
 export class UnauthorizedError extends Error {}
@@ -31,6 +42,10 @@ export const api = {
   mindFile: (path: string) => req<{ content: string }>('GET', `/api/mind/file?path=${encodeURIComponent(path)}`),
   mindHistory: () => req<MindCommit[]>('GET', '/api/mind/history'),
   mindCommit: (hash: string) => req<{ diff: string }>('GET', `/api/mind/commit/${hash}`),
+  settings: () => req<Settings>('GET', '/api/settings'),
+  saveSettings: (s: Settings) => req<Settings>('PUT', '/api/settings', s),
+  checkOllama: (host: string) => req<CheckResult>('POST', '/api/settings/check-ollama', { host }),
+  checkModel: (model: ModelSetting, host: string) => req<CheckResult>('POST', '/api/settings/check-model', { model, host }),
 };
 
 type Listener = (ev: ServerEvent) => void;

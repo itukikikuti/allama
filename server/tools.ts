@@ -3,7 +3,6 @@
 import type { Task, TaskKind } from '../shared/types.ts';
 import type { App } from './app.ts';
 import { readTurns, turnsToText } from './transcript.ts';
-import { checkBody, restartSoon } from './self.ts';
 import { formatTime, nowIso, shortId } from './util.ts';
 
 function addTask(
@@ -196,13 +195,6 @@ export async function callTool(app: App, sessionId: string, name: string, a: any
             `\n  ${w.prompt.replace(/\n/g, '\n  ')}`,
         )
         .join('\n');
-    }
-    case 'restart_self': {
-      const r = await checkBody();
-      if (!r.ok) return `確認に失敗したので再起動しない。直してからもう一度呼んで。\n${r.log}`;
-      console.log(`[allama] 自分を再起動する: ${a.reason ?? ''}`);
-      restartSoon();
-      return `確認が通ったので、数秒後に再起動する（動いている手は止まらない。その間、道具は数秒使えない）。\n${r.log}`;
     }
     case 'cancel_wakeup':
       return store.removeWakeup(String(a.wakeup_id ?? '')) ? '取り消した。' : 'その目覚ましは無い。';

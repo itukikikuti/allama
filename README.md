@@ -13,6 +13,7 @@ Claude Code という「手」を使いこなす「頭」。PCに住んでいる
 - **タスク**：頼みごとを書いて新しい手を動かす（モデルを選べる）。秘書からの質問・提案・報告・あなたのToDoに返事をする。
 - **セッション**：手の一覧と、それぞれの中身（Claude Desktop のように、思考・ツール・差分・サブエージェントを表示）。下の欄からそのセッションに返信できる（作業中なら区切りで届く）。
 - **記憶**：記憶フォルダの中身と、その変化の記録（git）を見る。見るだけ。
+- **設定**（右上の歯車）：Ollama の接続先、使うモデル（Ollama / Claude）、既定のモデル、あなたの呼び名。接続やモデルが使えるかをその場で確かめられる。保存するとすぐ反映される。
 
 ## 入れ方（Ubuntu・sudo 不要）
 
@@ -34,18 +35,8 @@ ollama signin              # Ollama のクラウドモデルを使うなら、�
 
 ### 自分を改良させるには
 
-秘書は `~/allama` のソースを書き換え、`restart_self` で反映する（型チェック・画面のビルド・読み込みの確認が通ったときだけ再起動する）。
-コミットしてプッシュするには、`~/allama` から GitHub に書き込めるようにしておく（例：デプロイキーを作り、書き込み権限つきでリポジトリに登録する）。
-
-```bash
-ssh-keygen -t ed25519 -f ~/.ssh/allama_github -N "" -C allama
-cat >>~/.ssh/config <<'EOF'
-Host github.com
-  IdentityFile ~/.ssh/allama_github
-EOF
-cat ~/.ssh/allama_github.pub   # これを GitHub のリポジトリの Settings → Deploy keys に「Allow write access」で登録
-git -C ~/allama remote set-url origin git@github.com:itukikikuti/allama.git
-```
+秘書は `~/allama` のソースを書き換え、`npm run check`（型チェック・画面のビルド・読み込みの確認）が通ったら、`restartCommand`（既定 `systemctl --user restart allama`）で自分を再起動して反映する。再起動しても作業中の手は止まらない。
+コミットしてプッシュするには、`~/allama` から GitHub に書き込めるようにしておく。
 
 ## 設定（config.json）
 
@@ -60,6 +51,7 @@ git -C ~/allama remote set-url origin git@github.com:itukikikuti/allama.git
 | `ollamaHost` | Ollama の場所（既定 `http://127.0.0.1:11434`） |
 | `authToken` | 画面の合言葉（空なら無し） |
 | `fallbackPatrolHours` | 予定が1つも無いときに入れる見回りまでの時間 |
+| `restartCommand` | 秘書が自分を再起動するコマンド（既定 `systemctl --user restart allama`） |
 
 モデルの例：
 
@@ -85,7 +77,7 @@ git -C ~/allama remote set-url origin git@github.com:itukikikuti/allama.git
 
 - 手は1ターンごとに `claude -p --resume <id>` で起動する。サーバーから切り離して動かしているので、サーバーを再起動しても作業は止まらない。
 - 毎ターン、頭は「自分は何者か」「記憶（self.md・user.md・最近の日記）」「いま動いているほかの手」「タスク画面の状況」「予定」をシステムプロンプトとして手に渡す（[server/head.ts](server/head.ts)）。
-- 手は頭の道具（[server/tool-defs.ts](server/tool-defs.ts)）で、質問・提案・報告・ToDo・新しい手・連絡・思い出す・目覚まし・自分の再起動を使う。
+- 手は頭の道具（[server/tool-defs.ts](server/tool-defs.ts)）で、質問・提案・報告・ToDo・新しい手・連絡・思い出す・目覚ましを使う。
 - 記憶の整理は本人の仕事。見回りのときに、まだ整理していない手の記録を読み返して日記に書き、整理済みにする。
 
 ### データの置き場所（dataDir）

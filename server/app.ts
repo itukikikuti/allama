@@ -22,7 +22,7 @@ export class App {
     this.mind = new Mind(config.dataDir);
     this.runner = new Runner(this);
     this.scheduler = new Scheduler(this);
-    this.store.on('change', () => this.scheduleState());
+    this.store.on('change', () => this.touch());
     setInterval(() => {
       for (const c of this.clients) c.write(': ping\n\n');
     }, 25_000).unref();
@@ -52,7 +52,8 @@ export class App {
     for (const c of this.clients) c.write(data);
   }
 
-  private scheduleState(): void {
+  /** 状態が変わったことを画面に知らせる */
+  touch(): void {
     if (this.stateTimer) return;
     this.stateTimer = setTimeout(() => {
       this.stateTimer = undefined;

@@ -38,15 +38,31 @@ export interface Config {
   /** 目覚ましが1つも無いとき、この時間後に見回りを入れる */
   fallbackPatrolHours: number;
   extraClaudeArgs: string[];
+  /** 自分を再起動するコマンド（本人に教える） */
+  restartCommand: string;
+}
+
+/** 設定画面で変えられる項目 */
+export interface Settings {
+  ownerName: string;
+  ollamaHost: string;
+  models: ModelConfig[];
+  defaultModelId: string;
 }
 
 function expandHome(p: string): string {
   return p === '~' || p.startsWith('~/') ? path.join(os.homedir(), p.slice(1)) : p;
 }
 
+export const configFile = (): string => process.env.ALLAMA_CONFIG ?? path.join(APP_DIR, 'config.json');
+
+function readRaw(): any {
+  const file = configFile();
+  return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+}
+
 export function loadConfig(): Config {
-  const file = process.env.ALLAMA_CONFIG ?? path.join(APP_DIR, 'config.json');
-  const raw = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+  const raw = readRaw();
   const models: ModelConfig[] = raw.models?.length
     ? raw.models
     : [{ id: 'claude', label: 'Claude', command: ['claude'] }];
@@ -63,7 +79,40 @@ export function loadConfig(): Config {
     ollamaHost: raw.ollamaHost ?? process.env.OLLAMA_HOST ?? 'http://127.0.0.1:11434',
     fallbackPatrolHours: raw.fallbackPatrolHours ?? 6,
     extraClaudeArgs: raw.extraClaudeArgs ?? [],
+    restartCommand: raw.restartCommand ?? 'systemctl --user restart allama',
   };
+}
+
+export function getSettings(cfg: Config): Settings {
+  return { ownerName: cfg.ownerName, ollamaHost: cfg.ollamaHost, models: cfg.models, defaultModelId: cfg.defaultModelId };
+}
+
+/** 設定画面からの変更を確かめて config.json に書き、動いている設定にもすぐ反映する */
+export function saveSettings(cfg: Config, s: Settings): Settings {
+  const models = Array.isArray(s.models) ? s.models : [];
+  if (!models.length) throw new Error('モデルが1つも無い');
+  const ids = new Set<string>();
+  for (const m of models) {
+    if (!m.id?.trim() || !m.label?.trim()) throw new Error('モデルのIDと表示名は必須');
+    if (ids.has(m.id)) throw new Error(`モデルのIDが重複している: ${m.id}`);
+    ids.add(m.id);
+    if (!m.ollama?.trim() && !m.command?.length) throw new Error(`「${m.label}」の中身（Ollama のモデル名か起動コマンド）が無い`);
+  }
+  if (!ids.has(s.defaultModelId)) throw new Error('既定のモデルが一覧に無い');
+  const next: Settings = {
+    ownerName: s.ownerName?.trim() || 'ユーザー',
+    ollamaHost: s.ollamaHost?.trim() || 'http://127.0.0.1:11434',
+    models,
+    defaultModelId: s.defaultModelId,
+  };
+  const raw = { ...readRaw(), ...next };
+  const file = configFile();
+  const tmp = `${file}.tmp`;
+  fs.writeFileSync(tmp, `${JSON.stringify(raw, null, 2)}
+`);
+  fs.renameSync(tmp, file);
+  Object.assign(cfg, next);
+  return getSettings(cfg);
 }
 
 /** `ollama launch claude` が Claude Code に渡すのと同じ設定 */
