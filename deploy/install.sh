@@ -19,7 +19,7 @@ if ! node --version 2>/dev/null | grep -q "^v$NODE_MAJOR\."; then
 fi
 node --version
 
-say "Claude Code"
+say "Claude Code（Claude のモデルを使うときのログイン用。allama 自身は同梱の Claude Code で動く）"
 npm install -g @anthropic-ai/claude-code >/dev/null
 claude --version
 
@@ -29,6 +29,11 @@ if [ ! -x "$PREFIX/ollama/bin/ollama" ]; then
   curl -fsSL https://ollama.com/download/ollama-linux-amd64.tar.zst | tar --zstd -x -C "$PREFIX/ollama" bin/ollama
 fi
 ollama --version 2>/dev/null | tail -1 || true
+
+say "埋め込みモデル（記憶を意味で探すため。この Ollama の中で動く）"
+systemctl --user start ollama.service 2>/dev/null || true
+sleep 2
+ollama pull qwen3-embedding:0.6b
 
 say "allama"
 cd "$APP_DIR"

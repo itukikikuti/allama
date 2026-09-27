@@ -1,6 +1,6 @@
 import type { AppState, ServerEvent } from '../shared/types.ts';
 import type { Config } from './config.ts';
-import { Mind } from './mind.ts';
+import { Memory } from './memory/index.ts';
 import { Runner } from './runner.ts';
 import { Scheduler } from './scheduler.ts';
 import { Store } from './store.ts';
@@ -9,7 +9,7 @@ import { Store } from './store.ts';
 export class App {
   config: Config;
   store: Store;
-  mind: Mind;
+  memory: Memory;
   runner: Runner;
   scheduler: Scheduler;
   /** 画面（SSE）への送り口。接続ごとに1つ */
@@ -19,7 +19,7 @@ export class App {
   constructor(config: Config) {
     this.config = config;
     this.store = new Store(config.dataDir);
-    this.mind = new Mind(config.dataDir);
+    this.memory = new Memory(this);
     this.runner = new Runner(this);
     this.scheduler = new Scheduler(this);
     this.store.on('change', () => this.touch());
@@ -41,6 +41,7 @@ export class App {
       models: config.models.map(({ id, label }) => ({ id, label })),
       defaultModelId: config.defaultModelId,
       defaultCwd: config.defaultCwd,
+      memory: this.memory.status(),
     };
   }
 

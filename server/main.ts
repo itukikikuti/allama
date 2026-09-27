@@ -6,7 +6,6 @@ import { loadConfig } from './config.ts';
 const config = loadConfig();
 fs.mkdirSync(config.defaultCwd, { recursive: true });
 const app = new App(config);
-await app.mind.init();
 app.runner.start();
 app.scheduler.start();
 startHttp(app);

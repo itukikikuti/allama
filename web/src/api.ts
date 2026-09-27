@@ -1,8 +1,8 @@
 import type {
   AppState,
   CheckResult,
-  MindCommit,
-  MindFile,
+  MemoryItem,
+  MemoryLog,
   ModelSetting,
   ServerEvent,
   SessionMeta,
@@ -38,14 +38,17 @@ export const api = {
   stop: (id: string) => req<{ ok: boolean }>('POST', `/api/sessions/${id}/stop`),
   sendMessage: (id: string, text: string) =>
     req<{ result: 'started' | 'queued' }>('POST', `/api/sessions/${id}/message`, { text }),
-  mindFiles: () => req<MindFile[]>('GET', '/api/mind/files'),
-  mindFile: (path: string) => req<{ content: string }>('GET', `/api/mind/file?path=${encodeURIComponent(path)}`),
-  mindHistory: () => req<MindCommit[]>('GET', '/api/mind/history'),
-  mindCommit: (hash: string) => req<{ diff: string }>('GET', `/api/mind/commit/${hash}`),
+  memoryList: (q: string, kind: string) =>
+    req<MemoryItem[]>('GET', `/api/memory/list?limit=100&q=${encodeURIComponent(q)}&kind=${encodeURIComponent(kind)}`),
+  memoryItem: (id: string) => req<MemoryItem & { sourceItems: MemoryItem[] }>('GET', `/api/memory/item/${id}`),
+  memoryLogs: () => req<MemoryLog[]>('GET', '/api/memory/logs'),
+  consolidate: () => req<{ ok: boolean }>('POST', '/api/memory/consolidate'),
   settings: () => req<Settings>('GET', '/api/settings'),
   saveSettings: (s: Settings) => req<Settings>('PUT', '/api/settings', s),
   checkOllama: (host: string) => req<CheckResult>('POST', '/api/settings/check-ollama', { host }),
   checkModel: (model: ModelSetting, host: string) => req<CheckResult>('POST', '/api/settings/check-model', { model, host }),
+  checkEmbed: (model: string, host: string) => req<CheckResult>('POST', '/api/settings/check-embed', { model, host }),
+  pull: (model: string, host: string) => req<CheckResult>('POST', '/api/settings/pull', { model, host }),
 };
 
 type Listener = (ev: ServerEvent) => void;

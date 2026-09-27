@@ -3,6 +3,7 @@ import {
   AlarmClock,
   AlarmClockOff,
   Bot,
+  Brain,
   ChevronRight,
   CircleAlert,
   ClipboardCheck,
@@ -60,6 +61,7 @@ const HEAD_TOOLS: Record<string, HeadDesc> = {
   list_wakeups: [Clock, '目覚ましを確認', () => undefined],
   cancel_wakeup: [AlarmClockOff, '目覚ましを取り消し', (i) => i.wakeup_id],
   restart_self: [RotateCcw, '仕組みを再起動', (i) => i.reason],
+  remember: [Brain, '思い出す', (i) => i.query],
 };
 
 const firstString = (i: any): string | undefined => {

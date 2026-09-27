@@ -2,110 +2,109 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
 
-/** このアプリ（秘書の体）のソースコードの場所 */
+/** この仕組みのソースコードの場所 */
 export const APP_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-export interface ModelConfig {
-  id: string;
-  label: string;
-  /**
-   * Ollama のモデル名（例: "deepseek-v4.1-flash:cloud"）。
-   * 指定すると `ollama launch claude --model <これ>` と同じ設定で Claude Code を動かす。
-   */
-  ollama?: string;
-  /**
-   * Claude Code を起動するコマンドの前半。後ろに Claude Code の引数が付く（既定 ["claude"]）。
-   * 例: ["claude", "--model", "opus"]
-   *     ["ollama", "launch", "claude", "--model", "glm-4.6:cloud", "--yes", "--"]
-   */
-  command?: string[];
-  env?: Record<string, string>;
-}
+/** セッションに使うモデル。Ollama のモデルか、Claude（Anthropic）のモデルのどちらか */
+const ModelSchema = z
+  .object({
+    id: z.string().trim().min(1, 'モデルのIDは必須'),
+    label: z.string().trim().min(1, 'モデルの表示名は必須'),
+    /** Ollama のモデル名（例: deepseek-v4.1-flash:cloud）。`ollama launch claude` と同じ設定で動かす */
+    ollama: z.string().trim().optional(),
+    /** Claude のモデル名（例: opus）。空なら Claude Code の既定 */
+    claude: z.string().trim().optional(),
+  })
+  .refine((m) => (m.ollama !== undefined) !== (m.claude !== undefined), {
+    message: 'モデルは Ollama か Claude のどちらか一方を指定する',
+  })
+  .refine((m) => m.ollama === undefined || m.ollama.length > 0, { message: 'Ollama のモデル名が空' });
 
-export interface Config {
+const SettingsSchema = z
+  .object({
+    ollamaHost: z.string().trim().min(1).default('http://127.0.0.1:11434'),
+    models: z.array(ModelSchema).min(1, 'モデルが1つも無い'),
+    defaultModelId: z.string(),
+    memory: z.object({
+      /** 記憶の処理（覚える・整理する）に使う Ollama のモデル */
+      model: z.string().trim().min(1, '記憶に使うモデルが空'),
+      /** 意味で探すための埋め込みモデル（Ollama で手元で動く） */
+      embedModel: z.string().trim().min(1, '埋め込みモデルが空'),
+    }),
+  })
+  .refine((s) => s.models.some((m) => m.id === s.defaultModelId), { message: '既定のモデルが一覧に無い' })
+  .refine((s) => new Set(s.models.map((m) => m.id)).size === s.models.length, { message: 'モデルのIDが重複している' });
+
+export type ModelConfig = z.infer<typeof ModelSchema>;
+export type Settings = z.infer<typeof SettingsSchema>;
+
+export interface Config extends Settings {
   host: string;
   port: number;
   dataDir: string;
   defaultCwd: string;
   timezone: string;
-  models: ModelConfig[];
-  defaultModelId: string;
   authToken: string;
-  /** ollama を指定したモデルの接続先 */
-  ollamaHost: string;
-  /** 目覚ましが1つも無いとき、この時間後に見回りを入れる */
+  /** 目覚ましが1つも無いとき、この時間後に起こす */
   fallbackPatrolHours: number;
-  extraClaudeArgs: string[];
-}
-
-/** 設定画面で変えられる項目 */
-export interface Settings {
-  ollamaHost: string;
-  models: ModelConfig[];
-  defaultModelId: string;
 }
 
 function expandHome(p: string): string {
   return p === '~' || p.startsWith('~/') ? path.join(os.homedir(), p.slice(1)) : p;
 }
 
-export const configFile = (): string => process.env.ALLAMA_CONFIG ?? path.join(APP_DIR, 'config.json');
+const configFile = (): string => process.env.ALLAMA_CONFIG ?? path.join(APP_DIR, 'config.json');
 
 function readRaw(): any {
   const file = configFile();
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
 }
 
+/** 古い形（command: ["claude", "--model", "opus"]）を今の形に直す */
+function migrateModel(m: any): any {
+  if (m.ollama !== undefined || m.claude !== undefined) return { id: m.id, label: m.label, ollama: m.ollama, claude: m.claude };
+  const c: string[] = m.command ?? ['claude'];
+  return { id: m.id, label: m.label, claude: c[1] === '--model' ? c[2] ?? '' : '' };
+}
+
 export function loadConfig(): Config {
   const raw = readRaw();
-  const models: ModelConfig[] = raw.models?.length
-    ? raw.models
-    : [{ id: 'claude', label: 'Claude', command: ['claude'] }];
+  const models = (raw.models?.length ? raw.models : [{ id: 'claude', label: 'Claude', claude: '' }]).map(migrateModel);
+  const firstOllama = models.find((m: ModelConfig) => m.ollama)?.ollama ?? 'deepseek-v4.1-flash:cloud';
+  const settings = SettingsSchema.parse({
+    ollamaHost: raw.ollamaHost ?? process.env.OLLAMA_HOST,
+    models,
+    defaultModelId: raw.defaultModelId ?? models[0].id,
+    memory: { model: raw.memory?.model ?? firstOllama, embedModel: raw.memory?.embedModel ?? 'qwen3-embedding:0.6b' },
+  });
   return {
+    ...settings,
     host: raw.host ?? '127.0.0.1',
     port: raw.port ?? 3170,
     dataDir: path.resolve(APP_DIR, expandHome(raw.dataDir ?? '~/.allama')),
     defaultCwd: path.resolve(APP_DIR, expandHome(raw.defaultCwd ?? '~')),
     timezone: raw.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
-    models,
-    defaultModelId: raw.defaultModelId ?? models[0].id,
     authToken: raw.authToken ?? '',
-    ollamaHost: raw.ollamaHost ?? process.env.OLLAMA_HOST ?? 'http://127.0.0.1:11434',
     fallbackPatrolHours: raw.fallbackPatrolHours ?? 6,
-    extraClaudeArgs: raw.extraClaudeArgs ?? [],
   };
 }
 
 export function getSettings(cfg: Config): Settings {
-  return { ollamaHost: cfg.ollamaHost, models: cfg.models, defaultModelId: cfg.defaultModelId };
+  return { ollamaHost: cfg.ollamaHost, models: cfg.models, defaultModelId: cfg.defaultModelId, memory: cfg.memory };
 }
 
 /** 設定画面からの変更を確かめて config.json に書き、動いている設定にもすぐ反映する */
-export function saveSettings(cfg: Config, s: Settings): Settings {
-  const models = Array.isArray(s.models) ? s.models : [];
-  if (!models.length) throw new Error('モデルが1つも無い');
-  const ids = new Set<string>();
-  for (const m of models) {
-    if (!m.id?.trim() || !m.label?.trim()) throw new Error('モデルのIDと表示名は必須');
-    if (ids.has(m.id)) throw new Error(`モデルのIDが重複している: ${m.id}`);
-    ids.add(m.id);
-    if (!m.ollama?.trim() && !m.command?.length) throw new Error(`「${m.label}」の中身（Ollama のモデル名か起動コマンド）が無い`);
-  }
-  if (!ids.has(s.defaultModelId)) throw new Error('既定のモデルが一覧に無い');
-  const next: Settings = {
-    ollamaHost: s.ollamaHost?.trim() || 'http://127.0.0.1:11434',
-    models,
-    defaultModelId: s.defaultModelId,
-  };
-  const raw = { ...readRaw(), ...next };
-  delete raw.ownerName; // 呼び名は記憶に持つ（古い設定から消す）
+export function saveSettings(cfg: Config, input: unknown): Settings {
+  const r = SettingsSchema.safeParse(input);
+  if (!r.success) throw new Error(r.error.issues.map((i) => i.message).join('、'));
+  const raw = { ...readRaw(), ...r.data };
+  delete raw.ownerName;
   const file = configFile();
-  const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, `${JSON.stringify(raw, null, 2)}
-`);
-  fs.renameSync(tmp, file);
-  Object.assign(cfg, next);
+  fs.writeFileSync(`${file}.tmp`, `${JSON.stringify(raw, null, 2)}\n`);
+  fs.renameSync(`${file}.tmp`, file);
+  Object.assign(cfg, r.data);
   return getSettings(cfg);
 }
 
@@ -120,10 +119,4 @@ export function ollamaEnv(host: string, model: string): Record<string, string> {
     ANTHROPIC_DEFAULT_SONNET_MODEL: model,
     ANTHROPIC_DEFAULT_OPUS_MODEL: model,
   };
-}
-
-/** MCPサーバーなど、同じPC内からこのサーバーに話しかけるときのURL */
-export function internalUrl(cfg: Config): string {
-  const host = cfg.host === '0.0.0.0' || cfg.host === '::' ? '127.0.0.1' : cfg.host;
-  return `http://${host.includes(':') ? `[${host}]` : host}:${cfg.port}`;
 }

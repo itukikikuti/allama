@@ -19,6 +19,8 @@ export class Scheduler {
   }
 
   private tick(): void {
+    // 暇なとき、溜まった記憶を整理する（睡眠）
+    this.app.memory.maybeConsolidate();
     const { store, config } = this.app;
     const now = Date.now();
     for (const w of [...store.wakeups]) {

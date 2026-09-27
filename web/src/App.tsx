@@ -1,72 +1,45 @@
 import { useEffect, useState } from 'react';
-import type { AppState } from '../../shared/types.ts';
-import { UnauthorizedError, api, connectEvents, onServerEvent, setToken } from './api.ts';
-import { MindPage, parseMindRoute, type MindRoute } from './pages/MindPage.tsx';
-import { SessionView } from './pages/SessionView.tsx';
-import { SettingsPage } from './pages/SettingsPage.tsx';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link, Route, Router, Switch, useLocation } from 'wouter';
+import { useHashLocation } from 'wouter/use-hash-location';
 import { Settings as SettingsIcon } from 'lucide-react';
+import { UnauthorizedError, api, connectEvents, onServerEvent, setToken } from './api.ts';
+import { MemoryPage } from './pages/MemoryPage.tsx';
+import { SessionView } from './pages/SessionView.tsx';
 import { SessionsPage } from './pages/SessionsPage.tsx';
+import { SettingsPage } from './pages/SettingsPage.tsx';
 import { TasksPage } from './pages/TasksPage.tsx';
 import { cx } from './util.ts';
 
-function useHash(): string {
-  const [hash, setHash] = useState(location.hash);
-  useEffect(() => {
-    const f = () => setHash(location.hash);
-    window.addEventListener('hashchange', f);
-    return () => window.removeEventListener('hashchange', f);
-  }, []);
-  return hash;
-}
-
-type Route =
-  | { name: 'tasks' }
-  | { name: 'sessions' }
-  | { name: 'session'; id: string }
-  | { name: 'mind'; mind: MindRoute }
-  | { name: 'settings' };
-
-function parseRoute(hash: string): Route {
-  const m = hash.match(/^#\/sessions\/([\w-]+)/);
-  if (m) return { name: 'session', id: m[1] };
-  if (hash.startsWith('#/sessions')) return { name: 'sessions' };
-  if (hash.startsWith('#/mind')) return { name: 'mind', mind: parseMindRoute(hash) };
-  if (hash.startsWith('#/settings')) return { name: 'settings' };
-  return { name: 'tasks' };
-}
-
-export function App() {
-  const [state, setState] = useState<AppState | null>(null);
+/** 状態はサーバーからの知らせ（SSE）で更新し続ける */
+function useAppState() {
+  const qc = useQueryClient();
   const [online, setOnline] = useState(false);
-  const [needToken, setNeedToken] = useState(false);
-  const [error, setError] = useState('');
-  const [attempt, setAttempt] = useState(0);
-  const route = parseRoute(useHash());
-
+  const query = useQuery({ queryKey: ['state'], queryFn: api.state, staleTime: Infinity, retry: false });
   useEffect(() => {
-    let alive = true;
-    api
-      .state()
-      .then((s) => {
-        if (!alive) return;
-        setState(s);
-        setNeedToken(false);
-      })
-      .catch((e) => {
-        if (e instanceof UnauthorizedError) setNeedToken(true);
-        else setError((e as Error).message);
-      });
     const off = onServerEvent((ev) => {
-      if (ev.type === 'state') setState(ev.state);
+      if (ev.type === 'state') qc.setQueryData(['state'], ev.state);
     });
     const close = connectEvents(setOnline);
     return () => {
-      alive = false;
       off();
       close();
     };
-  }, [attempt]);
+  }, [qc]);
+  return { ...query, online };
+}
 
+export function App() {
+  return (
+    <Router hook={useHashLocation}>
+      <Shell />
+    </Router>
+  );
+}
+
+function Shell() {
+  const { data: state, error, online, refetch } = useAppState();
+  const [location] = useLocation();
   const openCount = state?.tasks.filter((t) => t.status === 'open').length ?? 0;
   const runningCount = state?.sessions.filter((s) => s.status === 'running').length ?? 0;
 
@@ -75,66 +48,77 @@ export function App() {
   }, [openCount]);
 
   useEffect(() => {
-    if (route.name !== 'session') window.scrollTo(0, 0);
-  }, [route.name, location.hash]);
+    if (!location.startsWith('/sessions/')) window.scrollTo(0, 0);
+  }, [location]);
 
-  if (needToken) {
-    return (
-      <form
-        className="token-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const v = new FormData(e.currentTarget).get('token');
-          setToken(String(v ?? ''));
-          setAttempt((n) => n + 1);
-        }}
-      >
-        <img src="/icon.svg" alt="" width={48} height={48} />
-        <label>
-          合言葉
-          <input name="token" type="password" autoFocus />
-        </label>
-        <button type="submit" className="primary">
-          入る
-        </button>
-      </form>
-    );
-  }
+  if (error instanceof UnauthorizedError) return <TokenForm onDone={() => refetch()} />;
+  if (!state) return <div className="boot">{error ? `つながらない：${error.message}` : '起こしています…'}</div>;
 
-  if (!state) return <div className="boot">{error ? `つながらない：${error}` : '起こしています…'}</div>;
+  const tab = (href: string, active: boolean, label: React.ReactNode) => (
+    <Link href={href} className={cx(active && 'active')}>
+      {label}
+    </Link>
+  );
 
   return (
     <div className="app">
       <header className="topbar">
         <div className="topbar-inner">
-          <a className="brand" href="#/">
+          <Link className="brand" href="/">
             <img src="/icon.svg" alt="" width={22} height={22} />
             <span>allama</span>
             <span className={cx('conn', online ? 'on' : 'off')} title={online ? 'つながっている' : '切れている（自動で繋ぎ直す）'} />
-          </a>
+          </Link>
           <nav className="tabs">
-            <a href="#/" className={cx(route.name === 'tasks' && 'active')}>
-              タスク{openCount > 0 && <span className="badge">{openCount}</span>}
-            </a>
-            <a href="#/sessions" className={cx((route.name === 'sessions' || route.name === 'session') && 'active')}>
-              セッション{runningCount > 0 && <span className="badge live">{runningCount}</span>}
-            </a>
-            <a href="#/mind" className={cx(route.name === 'mind' && 'active')}>
-              記憶
-            </a>
+            {tab('/', location === '/', <>タスク{openCount > 0 && <span className="badge">{openCount}</span>}</>)}
+            {tab('/sessions', location.startsWith('/sessions'), <>セッション{runningCount > 0 && <span className="badge live">{runningCount}</span>}</>)}
+            {tab('/memory', location.startsWith('/memory'), <>記憶{state.memory.busy && <span className="badge live">…</span>}</>)}
           </nav>
-          <a href="#/settings" className={cx('icon-btn', route.name === 'settings' && 'active')} title="設定">
+          <Link href="/settings" className={cx('icon-btn', location === '/settings' && 'active')} title="設定">
             <SettingsIcon size={17} />
-          </a>
+          </Link>
         </div>
       </header>
       <main>
-        {route.name === 'tasks' && <TasksPage state={state} />}
-        {route.name === 'sessions' && <SessionsPage state={state} />}
-        {route.name === 'session' && <SessionView key={route.id} id={route.id} state={state} />}
-        {route.name === 'mind' && <MindPage route={route.mind} />}
-        {route.name === 'settings' && <SettingsPage />}
+        <Switch>
+          <Route path="/sessions/:id">{(p) => <SessionView key={p.id} id={p.id} state={state} />}</Route>
+          <Route path="/sessions">
+            <SessionsPage state={state} />
+          </Route>
+          <Route path="/memory">
+            <MemoryPage state={state} />
+          </Route>
+          <Route path="/settings">
+            <SettingsPage />
+          </Route>
+          <Route>
+            <TasksPage state={state} />
+          </Route>
+        </Switch>
       </main>
     </div>
   );
 }
+
+function TokenForm({ onDone }: { onDone: () => void }) {
+  return (
+    <form
+      className="token-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        setToken(String(new FormData(e.currentTarget).get('token') ?? ''));
+        onDone();
+      }}
+    >
+      <img src="/icon.svg" alt="" width={48} height={48} />
+      <label>
+        合言葉
+        <input name="token" type="password" autoFocus />
+      </label>
+      <button type="submit" className="primary">
+        入る
+      </button>
+    </form>
+  );
+}
+

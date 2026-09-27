@@ -21,7 +21,6 @@ export interface SessionMeta {
   summary?: string;
   /** 開始したターン数 */
   turns: number;
-  pid?: number;
   /** 実行中に届いたメッセージ。ターンが終わったら渡す */
   queue: TurnInput[];
   lastError?: string;
@@ -88,6 +87,7 @@ export interface AppState {
   models: ModelOption[];
   defaultModelId: string;
   defaultCwd: string;
+  memory: MemoryStatus;
 }
 
 export type ServerEvent =
@@ -95,36 +95,66 @@ export type ServerEvent =
   | { type: 'turn-start'; sessionId: string; turn: number; input: TurnInput }
   | { type: 'session-event'; sessionId: string; turn: number; event: any };
 
-export interface MindFile {
-  path: string;
-  size: number;
-  mtime: string;
-}
 
-export interface MindCommit {
-  hash: string;
-  date: string;
-  message: string;
-  /** status: A=追加 M=変更 D=削除 R=名前変更 */
-  files: { status: string; path: string }[];
-}
 
-/** 設定画面で扱うモデル（config.json の models の1件） */
+/** 設定画面で扱うモデル（config.json の models の1件）。ollama か claude のどちらか */
 export interface ModelSetting {
   id: string;
   label: string;
   ollama?: string;
-  command?: string[];
-  env?: Record<string, string>;
+  claude?: string;
 }
 
 export interface Settings {
   ollamaHost: string;
   models: ModelSetting[];
   defaultModelId: string;
+  memory: { model: string; embedModel: string };
 }
 
 export interface CheckResult {
   ok: boolean;
   message: string;
+}
+
+// ---- 記憶 ----
+
+/** episode=出来事 / fact=知ったこと / procedure=やり方 / reflection=気づき */
+export type MemoryKind = 'episode' | 'fact' | 'procedure' | 'reflection';
+
+export interface MemoryItem {
+  id: string;
+  kind: MemoryKind;
+  content: string;
+  /** 0〜1 */
+  importance: number;
+  /** 出来事が起きた時刻 */
+  happenedAt?: string;
+  createdAt: string;
+  lastRecalledAt?: string;
+  recallCount: number;
+  /** 新しい記憶に置き換えられた */
+  supersededBy?: string;
+  /** 整理（睡眠）で扱い済み */
+  consolidated: boolean;
+  sourceSession?: string;
+  /** 整理で作られた記憶の、もとになった記憶 */
+  sources?: string[];
+  /** 検索のときだけ付く：今の覚えている度合い（0〜1）と、その検索での点数 */
+  retention?: number;
+  score?: number;
+}
+
+export interface MemoryLog {
+  at: string;
+  kind: string;
+  message: string;
+}
+
+export interface MemoryStatus {
+  counts: Record<string, number>;
+  unconsolidated: number;
+  lastConsolidatedAt?: string;
+  core?: { content: string; createdAt: string; version: number };
+  busy: string | null;
 }

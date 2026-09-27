@@ -41,7 +41,3 @@ export async function checkBody(): Promise<{ ok: boolean; log: string }> {
   return { ok: true, log: logs.join('\n') };
 }
 
-/** 少し待ってから終了する。systemd（Restart=always）がすぐに起こし直す */
-export function restartSoon(): void {
-  setTimeout(() => process.exit(0), 1500);
-}

@@ -1,47 +1,35 @@
 import { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CircleAlert, CircleCheck, Loader2, Plus, Trash2 } from 'lucide-react';
 import type { CheckResult, ModelSetting, Settings } from '../../../shared/types.ts';
 import { api } from '../api.ts';
 import { cx } from '../util.ts';
 
-type Kind = 'ollama' | 'claude' | 'custom';
+type Kind = 'ollama' | 'claude';
 
-/** 画面で編集するための形。保存するときに config.json の形に戻す */
+/** 画面で編集するための形 */
 interface Row {
   key: number;
   id: string;
   label: string;
   kind: Kind;
   model: string;
-  original: ModelSetting;
 }
 
 let nextKey = 1;
-
-function toRow(m: ModelSetting): Row {
-  const base = { key: nextKey++, id: m.id, label: m.label, original: m };
-  if (m.ollama) return { ...base, kind: 'ollama', model: m.ollama };
-  const c = m.command ?? ['claude'];
-  if (!m.env && c[0] === 'claude' && (c.length === 1 || (c.length === 3 && c[1] === '--model'))) {
-    return { ...base, kind: 'claude', model: c[2] ?? '' };
-  }
-  return { ...base, kind: 'custom', model: c.join(' ') };
-}
-
-function toModel(r: Row): ModelSetting {
-  if (r.kind === 'ollama') return { id: r.id, label: r.label, ollama: r.model.trim() };
-  if (r.kind === 'claude') return { id: r.id, label: r.label, command: r.model.trim() ? ['claude', '--model', r.model.trim()] : ['claude'] };
-  return { ...r.original, id: r.id, label: r.label };
-}
+const toRow = (m: ModelSetting): Row => ({ key: nextKey++, id: m.id, label: m.label, kind: m.ollama !== undefined ? 'ollama' : 'claude', model: m.ollama ?? m.claude ?? '' });
+const toModel = (r: Row): ModelSetting => (r.kind === 'ollama' ? { id: r.id, label: r.label, ollama: r.model.trim() } : { id: r.id, label: r.label, claude: r.model.trim() });
 
 function newId(rows: Row[], hint: string): string {
-  const base = hint.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'model';
-  let id = base;
-  for (let i = 2; rows.some((r) => r.id === id); i++) id = `${base}-${i}`;
+  let id = hint;
+  for (let i = 2; rows.some((r) => r.id === id); i++) id = `${hint}-${i}`;
   return id;
 }
 
-function Result({ r }: { r?: CheckResult | 'busy' }) {
+type Check = CheckResult | 'busy' | undefined;
+const failed = (e: unknown): CheckResult => ({ ok: false, message: (e as Error).message });
+
+function Result({ r }: { r: Check }) {
   if (!r) return null;
   if (r === 'busy') return <span className="check busy"><Loader2 className="spin" size={13} /> 確かめています…</span>;
   return (
@@ -52,65 +40,45 @@ function Result({ r }: { r?: CheckResult | 'busy' }) {
 }
 
 export function SettingsPage() {
-  const [loaded, setLoaded] = useState<Settings | null>(null);
+  const qc = useQueryClient();
+  const settings = useQuery({ queryKey: ['settings'], queryFn: api.settings });
   const [host, setHost] = useState('');
   const [rows, setRows] = useState<Row[]>([]);
   const [defaultId, setDefaultId] = useState('');
-  const [hostCheck, setHostCheck] = useState<CheckResult | 'busy'>();
-  const [modelChecks, setModelChecks] = useState<Record<number, CheckResult | 'busy'>>({});
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [memModel, setMemModel] = useState('');
+  const [embedModel, setEmbedModel] = useState('');
+  const [checks, setChecks] = useState<Record<string, Check>>({});
 
   const apply = (s: Settings) => {
-    setLoaded(s);
     setHost(s.ollamaHost);
     setRows(s.models.map(toRow));
     setDefaultId(s.defaultModelId);
+    setMemModel(s.memory.model);
+    setEmbedModel(s.memory.embedModel);
   };
-
   useEffect(() => {
-    api.settings().then(apply).catch((e) => setMsg({ ok: false, text: (e as Error).message }));
-  }, []);
+    if (settings.data) apply(settings.data);
+  }, [settings.data]);
+
+  const save = useMutation({
+    mutationFn: () =>
+      api.saveSettings({ ollamaHost: host, models: rows.map(toModel), defaultModelId: defaultId, memory: { model: memModel, embedModel } }),
+    onSuccess: (s) => {
+      qc.setQueryData(['settings'], s);
+      setChecks({});
+    },
+  });
+
+  const check = async (key: string, run: () => Promise<CheckResult>) => {
+    setChecks((c) => ({ ...c, [key]: 'busy' }));
+    const r = await run().catch(failed);
+    setChecks((c) => ({ ...c, [key]: r }));
+  };
 
   const update = (key: number, patch: Partial<Row>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  const ollamaModels = rows.filter((r) => r.kind === 'ollama' && r.model.trim()).map((r) => r.model.trim());
 
-  const add = (kind: Kind) =>
-    setRows((rs) => [
-      ...rs,
-      { key: nextKey++, id: newId(rs, kind), label: kind === 'ollama' ? 'Ollama: ' : 'Claude', kind, model: '', original: { id: '', label: '' } },
-    ]);
-
-  const remove = (r: Row) => {
-    setRows((rs) => rs.filter((x) => x.key !== r.key));
-    if (defaultId === r.id) setDefaultId('');
-  };
-
-  const checkHost = async () => {
-    setHostCheck('busy');
-    setHostCheck(await api.checkOllama(host).catch((e) => ({ ok: false, message: (e as Error).message })));
-  };
-
-  const checkRow = async (r: Row) => {
-    setModelChecks((c) => ({ ...c, [r.key]: 'busy' }));
-    const res = await api.checkModel(toModel(r), host).catch((e) => ({ ok: false, message: (e as Error).message }));
-    setModelChecks((c) => ({ ...c, [r.key]: res }));
-  };
-
-  const save = async () => {
-    setSaving(true);
-    setMsg(null);
-    try {
-      apply(await api.saveSettings({ ollamaHost: host, models: rows.map(toModel), defaultModelId: defaultId }));
-      setModelChecks({});
-      setMsg({ ok: true, text: '保存した。次に動く手から使われる。' });
-    } catch (e) {
-      setMsg({ ok: false, text: (e as Error).message });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (!loaded) return <div className="page">{msg ? <div className="error-box">{msg.text}</div> : <div className="loading-inline">読み込み中…</div>}</div>;
+  if (!settings.data) return <div className="page">{settings.error ? <div className="error-box">{settings.error.message}</div> : <div className="loading-inline">読み込み中…</div>}</div>;
 
   return (
     <div className="page settings">
@@ -120,63 +88,91 @@ export function SettingsPage() {
           <span>接続先</span>
           <div className="field-row">
             <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="http://127.0.0.1:11434" />
-            <button type="button" onClick={checkHost}>確かめる</button>
+            <button type="button" onClick={() => check('host', () => api.checkOllama(host))}>確かめる</button>
           </div>
         </label>
-        <Result r={hostCheck} />
+        <Result r={checks.host} />
         <p className="muted small">クラウドモデル（〜:cloud）を使うには、Ollama が動いているマシンで一度 <code>ollama signin</code> が必要。</p>
       </div>
 
-      <h2>モデル</h2>
+      <h2>セッションのモデル</h2>
       <div className="card models">
         {rows.map((r) => (
           <div key={r.key} className="model-row">
             <div className="model-head">
-              <label className="radio" title="目覚ましなど、自動で始まる手が使う">
+              <label className="radio" title="目覚ましなど、自動で始まるセッションが使う">
                 <input type="radio" name="default" checked={defaultId === r.id} onChange={() => setDefaultId(r.id)} /> 既定
               </label>
               <input className="model-label" value={r.label} onChange={(e) => update(r.key, { label: e.target.value })} placeholder="表示名" />
-              <button type="button" className="icon-btn" onClick={() => remove(r)} title="消す">
+              <button type="button" className="icon-btn" onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))} title="消す">
                 <Trash2 size={15} />
               </button>
             </div>
             <div className="field-row">
-              <select
-                value={r.kind}
-                disabled={r.kind === 'custom'}
-                onChange={(e) => update(r.key, { kind: e.target.value as Kind })}
-              >
+              <select value={r.kind} onChange={(e) => update(r.key, { kind: e.target.value as Kind })}>
                 <option value="ollama">Ollama</option>
                 <option value="claude">Claude</option>
-                {r.kind === 'custom' && <option value="custom">カスタム</option>}
               </select>
               <input
                 value={r.model}
-                disabled={r.kind === 'custom'}
                 onChange={(e) => update(r.key, { model: e.target.value })}
                 placeholder={r.kind === 'ollama' ? 'モデル名（例: deepseek-v4.1-flash:cloud）' : 'モデル（空なら既定。例: opus）'}
               />
-              <button type="button" onClick={() => checkRow(r)} disabled={r.kind !== 'ollama' || !r.model.trim()}>
+              <button type="button" disabled={r.kind !== 'ollama' || !r.model.trim()} onClick={() => check(`m${r.key}`, () => api.checkModel(toModel(r), host))}>
                 確かめる
               </button>
             </div>
-            <Result r={modelChecks[r.key]} />
+            <Result r={checks[`m${r.key}`]} />
           </div>
         ))}
         <div className="add-row">
-          <button type="button" onClick={() => add('ollama')}>
+          <button type="button" onClick={() => setRows((rs) => [...rs, { key: nextKey++, id: newId(rs, 'ollama'), label: 'Ollama: ', kind: 'ollama', model: '' }])}>
             <Plus size={14} /> Ollama のモデル
           </button>
-          <button type="button" onClick={() => add('claude')}>
+          <button type="button" onClick={() => setRows((rs) => [...rs, { key: nextKey++, id: newId(rs, 'claude'), label: 'Claude', kind: 'claude', model: '' }])}>
             <Plus size={14} /> Claude のモデル
           </button>
         </div>
       </div>
 
+      <h2>記憶</h2>
+      <div className="card">
+        <label className="field">
+          <span>覚える・整理するのに使うモデル（Ollama）</span>
+          <div className="field-row">
+            <input value={memModel} onChange={(e) => setMemModel(e.target.value)} list="ollama-models" placeholder="deepseek-v4.1-flash:cloud" />
+            <button type="button" disabled={!memModel.trim()} onClick={() => check('mem', () => api.checkModel({ id: 'memory', label: 'memory', ollama: memModel.trim() }, host))}>
+              確かめる
+            </button>
+          </div>
+          <datalist id="ollama-models">
+            {ollamaModels.map((m) => (
+              <option key={m} value={m} />
+            ))}
+          </datalist>
+        </label>
+        <Result r={checks.mem} />
+        <label className="field">
+          <span>意味で探すための埋め込みモデル（Ollama のマシンで動く）</span>
+          <div className="field-row">
+            <input value={embedModel} onChange={(e) => setEmbedModel(e.target.value)} placeholder="qwen3-embedding:0.6b" />
+            <button type="button" disabled={!embedModel.trim()} onClick={() => check('embed', () => api.checkEmbed(embedModel.trim(), host))}>
+              確かめる
+            </button>
+            <button type="button" disabled={!embedModel.trim()} onClick={() => check('embed', () => api.pull(embedModel.trim(), host))}>
+              取得する
+            </button>
+          </div>
+        </label>
+        <Result r={checks.embed} />
+        <p className="muted small">埋め込みモデルを変えると、それまでの記憶は意味では探せなくなる（言葉では探せる）。</p>
+      </div>
+
       <div className="save-bar">
-        {msg && <span className={cx('check', msg.ok ? 'ok' : 'ng')}>{msg.text}</span>}
-        <button type="button" className="primary" onClick={save} disabled={saving}>
-          {saving ? '保存中…' : '保存する'}
+        {save.isError && <span className="check ng">{save.error.message}</span>}
+        {save.isSuccess && <span className="check ok">保存した。次に動くセッションから使われる。</span>}
+        <button type="button" className="primary" onClick={() => save.mutate()} disabled={save.isPending}>
+          {save.isPending ? '保存中…' : '保存する'}
         </button>
       </div>
     </div>

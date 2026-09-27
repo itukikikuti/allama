@@ -1,4 +1,4 @@
-// HTTPサーバー（Hono）。画面からの操作と、セッションの道具（MCP経由）の呼び出しを受ける。
+// HTTPサーバー（Hono）。画面からの操作を受ける。
 
 import path from 'node:path';
 import { Hono } from 'hono';
@@ -9,7 +9,9 @@ import type { App } from './app.ts';
 import { APP_DIR, getSettings, saveSettings } from './config.ts';
 import { checkModel, checkOllama } from './providers.ts';
 import { readTurns } from './transcript.ts';
-import { answerTask, callTool } from './tools.ts';
+import { answerTask } from './tools.ts';
+import { retention } from './memory/index.ts';
+import { embed, pull } from './memory/ollama.ts';
 
 const WEB_DIST = path.relative(process.cwd(), path.join(APP_DIR, 'web', 'dist')) || '.';
 
@@ -84,26 +86,42 @@ export function startHttp(app: App): void {
     return c.json(await checkModel(b.model ?? {}, String(b.host ?? app.config.ollamaHost)));
   });
 
-  // 記憶のビューワー（見るだけ）
-  api.get('/mind/files', (c) => c.json(app.mind.files()));
-  api.get('/mind/file', (c) => {
-    const content = app.mind.readSafe(c.req.query('path') ?? '');
-    return content === null ? c.json({ error: 'ファイルが見つからない' }, 404) : c.json({ content });
-  });
-  api.get('/mind/history', async (c) => c.json(await app.mind.history(Number(c.req.query('limit')) || 100)));
-  api.get('/mind/commit/:hash', async (c) => {
-    const diff = await app.mind.commitDiff(c.req.param('hash'));
-    return diff === null ? c.json({ error: 'その記録は見つからない' }, 404) : c.json({ diff });
-  });
-
-  // セッションの道具の呼び出し（mcp.ts から）
-  api.post('/head/call', async (c) => {
+  api.post('/settings/check-embed', async (c) => {
     const b = await c.req.json();
     try {
-      return c.json({ text: await callTool(app, String(b.sessionId), String(b.name), b.args) });
+      const [v] = await embed(String(b.host ?? app.config.ollamaHost), String(b.model), ['テスト']);
+      return c.json({ ok: true, message: `使える（${v.length}次元）` });
     } catch (e) {
-      return c.json({ text: (e as Error).message, isError: true });
+      const msg = (e as Error).message;
+      return c.json({ ok: false, message: /not found|404/.test(msg) ? 'まだ取ってきていない（「取得する」を押す）' : `使えない: ${msg}` });
     }
+  });
+  api.post('/settings/pull', async (c) => {
+    const b = await c.req.json();
+    await pull(String(b.host ?? app.config.ollamaHost), String(b.model));
+    return c.json({ ok: true, message: '取ってきた' });
+  });
+
+  // 記憶（見るだけ。整理は今すぐ走らせられる）
+  api.get('/memory/status', (c) => c.json(app.memory.status()));
+  api.get('/memory/list', async (c) => {
+    const q = c.req.query('q')?.trim();
+    const kind = c.req.query('kind') || undefined;
+    const limit = Math.min(Number(c.req.query('limit')) || 50, 200);
+    if (q) return c.json(await app.memory.search(q, { limit, kind }));
+    const now = Date.now();
+    const items = app.memory.db.list({ kind, limit, offset: Number(c.req.query('offset')) || 0 });
+    return c.json(items.map((m) => ({ ...m, retention: retention(m, now) })));
+  });
+  api.get('/memory/logs', (c) => c.json(app.memory.db.logs(50)));
+  api.get('/memory/item/:id', (c) => {
+    const m = app.memory.db.get(c.req.param('id'));
+    if (!m) return c.json({ error: 'その記憶は無い' }, 404);
+    return c.json({ ...m, retention: retention(m), sourceItems: app.memory.db.getMany(m.sources ?? []) });
+  });
+  api.post('/memory/consolidate', (c) => {
+    void app.memory.consolidate();
+    return c.json({ ok: true });
   });
 
   const root = new Hono();
