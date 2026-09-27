@@ -17,9 +17,11 @@
     "restart": "npm run check && systemctl --user restart allama"
   },
   "dependencies": {
+    "@hono/node-server": "^2.1.1",
     "diff": "^9.0.0",
     "dompurify": "^3.4.16",
     "highlight.js": "^11.12.0",
+    "hono": "^4.13.9",
     "lucide-react": "^1.48.0",
     "marked": "^18.0.14",
     "react": "^19.3.0",

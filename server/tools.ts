@@ -2,7 +2,6 @@
 
 import type { Task, TaskKind } from '../shared/types.ts';
 import type { App } from './app.ts';
-import { readTurns, turnsToText } from './transcript.ts';
 import { checkBody, restartSoon } from './self.ts';
 import { formatTime, nowIso, shortId } from './util.ts';
 
@@ -37,7 +36,7 @@ function parseTime(s: string | undefined, label: string): string | undefined {
 }
 
 export async function callTool(app: App, sessionId: string, name: string, a: any): Promise<string> {
-  const { store, runner, mind, config } = app;
+  const { store, runner, config } = app;
   const me = store.session(sessionId);
   if (!me) throw new Error(`呼び出し元のセッションが不明: ${sessionId}`);
   const t = (iso: string) => formatTime(iso, config.timezone);
@@ -62,50 +61,6 @@ export async function callTool(app: App, sessionId: string, name: string, a: any
       const task = addTask(app, me.id, 'todo', a.title, a.detail, { due: parseTime(a.due, 'due') });
       return `ToDoを載せた（task_id=${task.id}）。`;
     }
-    case 'list_tasks': {
-      const tasks = store.tasks.filter((x) => x.status === 'open' || a.include_closed).slice(-100);
-      if (!tasks.length) return 'タスクは無い。';
-      return tasks
-        .map(
-          (x) =>
-            `- [${x.kind}${x.status === 'done' ? '・済' : ''}] ${x.title} ／ task_id=${x.id} ／ 手: 「${titleOf(x.sessionId)}」 ／ ${t(x.createdAt)}` +
-            (x.due ? ` ／ 期限 ${t(x.due)}` : '') +
-            (x.answer ? ` ／ 返事: ${x.answer}` : '') +
-            (x.body ? `\n  ${x.body.replace(/\n/g, '\n  ')}` : ''),
-        )
-        .join('\n');
-    }
-    case 'close_task': {
-      const task = store.task(a.task_id);
-      if (!task) throw new Error(`タスクが見つからない: ${a.task_id}`);
-      // ユーザーが返事をして閉じたタスクの記録（返事の中身）を上書きしない
-      if (task.status === 'done') return `もう閉じている: ${task.title}（返事: ${task.answer ?? ''}）`;
-      store.updateTask(task.id, {
-        status: 'done',
-        closedAt: nowIso(),
-        answer: `（秘書が閉じた）${a.note ?? ''}`,
-      });
-      return `閉じた: ${task.title}`;
-    }
-
-    case 'set_activity':
-      store.updateSession(me.id, { activity: String(a.text ?? '').slice(0, 200) });
-      return '書いた。';
-    case 'set_title':
-      store.updateSession(me.id, { title: String(a.title ?? '').slice(0, 80) || me.title });
-      return '変えた。';
-    case 'list_sessions': {
-      const limit = Number(a.limit) || 30;
-      const list = [...store.sessions].sort((x, y) => y.updatedAt.localeCompare(x.updatedAt)).slice(0, limit);
-      return list
-        .map(
-          (s) =>
-            `- 「${s.title}」 id=${s.id} ／ ${s.status}${s.id === me.id ? '（この手）' : ''} ／ ${t(s.updatedAt)}` +
-            (s.activity ? ` ／ 今: ${s.activity}` : '') +
-            (s.digested ? '' : ' ／ 未整理'),
-        )
-        .join('\n');
-    }
     case 'start_session': {
       const s = runner.createSession({
         message: `【セッション「${me.title}」（id=${me.id}）から】\n${a.prompt}`,
@@ -129,42 +84,6 @@ export async function callTool(app: App, sessionId: string, name: string, a: any
       });
       return r === 'queued' ? '相手は作業中なので、区切りがついたら届く。' : '届けた（相手が動き出した）。';
     }
-    case 'list_models':
-      return config.models
-        .map((m) => `- ${m.id}: ${m.label}${m.id === config.defaultModelId ? '（既定）' : ''}`)
-        .join('\n');
-
-    case 'recall': {
-      const hits = mind.recall(store.sessions, String(a.query ?? ''), Number(a.limit) || 20);
-      if (!hits.length) return '見つからなかった。言い方を変えて探してみて。';
-      return hits
-        .map(
-          (h) =>
-            `- ${h.where}${h.sessionId ? ` id=${h.sessionId} ターン${h.turn}` : ''}${h.at ? `（${t(h.at)}）` : ''} 【${h.role}】\n  ${h.snippet}`,
-        )
-        .join('\n');
-    }
-    case 'read_session': {
-      const s = store.session(String(a.session_id ?? ''));
-      if (!s) throw new Error(`セッションが見つからない: ${a.session_id}`);
-      const max = Number(a.max_chars) || 30000;
-      const text = turnsToText(readTurns(config.dataDir, s, Number(a.from_turn) || 1));
-      const head = `セッション「${s.title}」 id=${s.id} ／ 開始 ${t(s.createdAt)} ／ 全${s.turns}ターン\n`;
-      return head + (text.length > max ? `…（前略。from_turn で前を読める）\n${text.slice(-max)}` : text);
-    }
-    case 'mark_digested': {
-      const ids: string[] = Array.isArray(a.session_ids) ? a.session_ids : [];
-      const done: string[] = [];
-      for (const id of ids) {
-        const s = store.session(id);
-        if (s) {
-          store.updateSession(s.id, { digested: true }, false);
-          done.push(s.title);
-        }
-      }
-      return done.length ? `整理済みにした: ${done.join('、')}` : '該当するセッションが無い。';
-    }
-
     case 'schedule_wakeup': {
       const at = a.at
         ? parseTime(a.at, 'at')!
@@ -202,7 +121,7 @@ export async function callTool(app: App, sessionId: string, name: string, a: any
       if (!r.ok) return `確認に失敗したので再起動しない。直してからもう一度呼んで。\n${r.log}`;
       console.log(`[allama] 自分を再起動する: ${a.reason ?? ''}`);
       restartSoon();
-      return `確認が通ったので、数秒後に再起動する（動いている手は止まらない。その間、道具は数秒使えない）。\n${r.log}`;
+      return `確認が通ったので、数秒後に再起動する（動いているセッションは止まらない。その間、道具は数秒使えない）。\n${r.log}`;
     }
     case 'cancel_wakeup':
       return store.removeWakeup(String(a.wakeup_id ?? '')) ? '取り消した。' : 'その目覚ましは無い。';

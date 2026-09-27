@@ -17,8 +17,6 @@ export interface SessionMeta {
   createdAt: string;
   updatedAt: string;
   status: SessionStatus;
-  /** 今やっていること（本人が set_activity で書く） */
-  activity?: string;
   /** 直近のターンの一言要約（Claude Code の post_turn_summary） */
   summary?: string;
   /** 開始したターン数 */
@@ -26,8 +24,6 @@ export interface SessionMeta {
   pid?: number;
   /** 実行中に届いたメッセージ。ターンが終わったら渡す */
   queue: TurnInput[];
-  /** 記憶（日記）に整理済みかどうか */
-  digested: boolean;
   lastError?: string;
   lastCostUsd?: number;
 }

@@ -1,4 +1,3 @@
-import type { ServerResponse } from 'node:http';
 import type { AppState, ServerEvent } from '../shared/types.ts';
 import type { Config } from './config.ts';
 import { Mind } from './mind.ts';
@@ -13,7 +12,8 @@ export class App {
   mind: Mind;
   runner: Runner;
   scheduler: Scheduler;
-  clients = new Set<ServerResponse>();
+  /** 画面（SSE）への送り口。接続ごとに1つ */
+  clients = new Set<(data: string) => void>();
   private stateTimer: NodeJS.Timeout | undefined;
 
   constructor(config: Config) {
@@ -23,9 +23,6 @@ export class App {
     this.runner = new Runner(this);
     this.scheduler = new Scheduler(this);
     this.store.on('change', () => this.touch());
-    setInterval(() => {
-      for (const c of this.clients) c.write(': ping\n\n');
-    }, 25_000).unref();
   }
 
   state(): AppState {
@@ -48,8 +45,8 @@ export class App {
   }
 
   emit(ev: ServerEvent): void {
-    const data = `data: ${JSON.stringify(ev)}\n\n`;
-    for (const c of this.clients) c.write(data);
+    const data = JSON.stringify(ev);
+    for (const send of this.clients) send(data);
   }
 
   /** 状態が変わったことを画面に知らせる */

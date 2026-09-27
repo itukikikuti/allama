@@ -60,7 +60,7 @@ export function SessionsPage({ state }: { state: AppState }) {
 }
 
 function SessionRow({ s, waiting, model }: { s: SessionMeta; waiting: boolean; model: string }) {
-  const sub = s.status === 'error' ? s.lastError : s.status === 'running' ? s.activity ?? s.summary : s.summary;
+  const sub = s.status === 'error' ? s.lastError : s.summary;
   return (
     <a className={cx('session-row', s.status)} href={`#/sessions/${s.id}`}>
       <span className="row-status">

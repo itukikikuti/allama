@@ -4,10 +4,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
-import type { MindCommit, MindFile, SessionMeta } from '../shared/types.ts';
+import type { MindCommit, MindFile } from '../shared/types.ts';
 import { APP_DIR } from './config.ts';
 import { readText } from './util.ts';
-import { readTurns, turnPieces } from './transcript.ts';
 
 function git(cwd: string, args: string[]): Promise<{ code: number; stdout: string }> {
   return new Promise((resolve, reject) => {
@@ -16,15 +15,6 @@ function git(cwd: string, args: string[]): Promise<{ code: number; stdout: strin
       resolve({ code: err ? Number((err as any).code) || 1 : 0, stdout: String(stdout) });
     });
   });
-}
-
-export interface RecallHit {
-  where: string;
-  sessionId?: string;
-  turn?: number;
-  at?: string;
-  role: string;
-  snippet: string;
 }
 
 export class Mind {
@@ -139,58 +129,5 @@ export class Mind {
       // 無ければ空
     }
     return out.sort();
-  }
-
-  /**
-   * 全セッションの記録と記憶フォルダから探す。
-   * キーワードを多く含む箇所ほど上に、同じなら新しいものほど上に並べる（半分以上のキーワードを含むものだけ）。
-   */
-  recall(sessions: SessionMeta[], query: string, limit = 20): RecallHit[] {
-    const terms = [...new Set(query.toLowerCase().split(/\s+/).filter(Boolean))];
-    if (terms.length === 0) return [];
-    const need = Math.max(1, Math.ceil(terms.length / 2));
-    const score = (text: string) => {
-      const low = text.toLowerCase();
-      return terms.filter((t) => low.includes(t)).length;
-    };
-    const snippet = (text: string) => {
-      const low = text.toLowerCase();
-      const first = terms.map((t) => low.indexOf(t)).filter((i) => i >= 0).sort((a, b) => a - b)[0] ?? 0;
-      const i = Math.max(0, first - 150);
-      return (i > 0 ? '…' : '') + text.slice(i, i + 500).replace(/\s+/g, ' ') + (text.length > i + 500 ? '…' : '');
-    };
-    const found: (RecallHit & { score: number; order: number })[] = [];
-    let order = 0;
-
-    for (const f of this.listFiles(1000)) {
-      const text = this.read(f);
-      const sc = score(text);
-      if (sc >= need) found.push({ where: `記憶フォルダ/${f}`, role: 'メモ', snippet: snippet(text), score: sc, order: order++ });
-    }
-
-    const sorted = [...sessions].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    for (const s of sorted) {
-      const turns = readTurns(this.dataDir, s).reverse();
-      for (const t of turns) {
-        for (const p of turnPieces(t, { resultChars: 5000 })) {
-          const sc = score(p.text);
-          if (sc < need) continue;
-          found.push({
-            where: `セッション「${s.title}」`,
-            sessionId: s.id,
-            turn: t.turn,
-            at: t.input.at,
-            role: p.role,
-            snippet: snippet(p.text),
-            score: sc,
-            order: order++,
-          });
-        }
-      }
-    }
-    return found
-      .sort((a, b) => b.score - a.score || a.order - b.order)
-      .slice(0, limit)
-      .map(({ score: _s, order: _o, ...hit }) => hit);
   }
 }

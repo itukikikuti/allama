@@ -9,7 +9,7 @@ import type { InputSource, SessionMeta, SessionStatus, Trigger, TurnInput } from
 import type { App } from './app.ts';
 import { APP_DIR, internalUrl, ollamaEnv } from './config.ts';
 import { buildSystemPrompt } from './head.ts';
-import { sessionDir, turnFile } from './transcript.ts';
+import { readTurns, sessionDir, turnFile, turnsToText } from './transcript.ts';
 import { firstLine, isAlive, newId, nowIso, readText, truncate } from './util.ts';
 
 /** 対話前提で、画面なしでは使えない（または頭の道具と役割が重なる）ツール */
@@ -104,6 +104,15 @@ export class Runner {
   }
 
   start(): void {
+    // 読みやすい記録が無い古いセッションの分を作っておく
+    for (const s of this.app.store.sessions) {
+      const file = path.join(sessionDir(this.app.config.dataDir, s.id), 'transcript.md');
+      if (s.turns > 0 && !fs.existsSync(file)) {
+        fs.writeFileSync(file, `# ${s.title}
+${turnsToText(readTurns(this.app.config.dataDir, s))}
+`);
+      }
+    }
     // 前回サーバーが止まったときに動いていた手を、もう一度追いかける
     for (const s of this.app.store.sessions) {
       if (s.status !== 'running') continue;
@@ -136,7 +145,6 @@ export class Runner {
       status: 'idle',
       turns: 0,
       queue: [],
-      digested: false,
     };
     store.addSession(meta);
     const source: InputSource =
@@ -185,7 +193,7 @@ export class Runner {
 
     fs.writeFileSync(f('in.json'), JSON.stringify(input, null, 2));
     fs.writeFileSync(f('in.txt'), input.text);
-    fs.writeFileSync(f('sys.md'), buildSystemPrompt(this.app, meta, turn, input));
+    fs.writeFileSync(f('sys.md'), buildSystemPrompt(this.app));
 
     const mcpPath = path.join(sessionDir(config.dataDir, meta.id), 'mcp.json');
     fs.writeFileSync(
@@ -268,7 +276,6 @@ export class Runner {
       status: 'running',
       pid: child.pid,
       lastError: undefined,
-      digested: false,
     });
     this.app.emit({ type: 'turn-start', sessionId: meta.id, turn, input });
   }
@@ -365,11 +372,13 @@ export class Runner {
     store.updateSession(meta.id, {
       status,
       pid: undefined,
-      activity: undefined,
       lastError,
       lastCostUsd: r?.total_cost_usd,
-      digested: false,
     });
+    // Grep や Read で読み返せるよう、読みやすい形の記録も書き出す
+    fs.writeFileSync(path.join(sessionDir(config.dataDir, meta.id), 'transcript.md'), `# ${meta.title}
+${turnsToText(readTurns(config.dataDir, meta))}
+`);
     void mind.backup(`${meta.title}（ターン${tail.turn}）`);
 
     const s = store.session(meta.id);

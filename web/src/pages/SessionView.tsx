@@ -148,7 +148,7 @@ export function SessionView({ id, state }: { id: string; state: AppState }) {
       {running && (
         <div className="working">
           <Loader2 className="spin" size={15} />
-          <span>{meta.activity ?? (thinking ? `考えている…（${thinking}トークン）` : '作業中…')}</span>
+          <span>{thinking ? `考えている…（${thinking}トークン）` : '作業中…'}</span>
         </div>
       )}
       {meta.status === 'error' && meta.lastError && (
