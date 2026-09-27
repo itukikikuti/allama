@@ -99,6 +99,11 @@ git -C ~/allama remote set-url origin git@github.com:itukikikuti/allama.git
 
 記憶とデータはソースコードの外にあり、リポジトリには入らない。
 
+## 以前の allama
+
+このリポジトリには、以前の allama（あなたとAIの仕事を1つのタスクリストに集める Windows 向けの仕事管理 CLI、v0.2.1）の履歴も残っている。
+その最後の状態はコミット `3a22da1` で見られる。
+
 ## 開発
 
 ```bash
