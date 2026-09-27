@@ -7,8 +7,10 @@ import type { MemoryItem } from '../shared/types.ts';
 import type { App } from './app.ts';
 import { Memory } from './memory/index.ts';
 
-/** 目覚ましが1つも無いときに、仕組みが起こすときの文 */
-export const PATROL_PROMPT = '予定されている目覚ましが1つも無かったので、仕組みが起こした。';
+/** 目覚ましが1つも無いときに、仕組みが起こすときの文。
+ * 文は掛けた時点で決まり、鳴るのは数時間後なので、鳴った時点のことを書いてはいけない。 */
+export const PATROL_PROMPT =
+  '見回りの目覚まし。掛けたときは予定が1つも無かったので、仕組みが起こした。鳴るまでに予定が入っていることもある。';
 
 export function buildSystemPrompt(app: App, recalled: MemoryItem[]): string {
   const { config, memory } = app;
