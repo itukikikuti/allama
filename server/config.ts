@@ -37,8 +37,6 @@ export interface Config {
   /** 目覚ましが1つも無いとき、この時間後に見回りを入れる */
   fallbackPatrolHours: number;
   extraClaudeArgs: string[];
-  /** 自分を再起動するコマンド（本人に教える）。既定は確認してから再起動する npm run restart */
-  restartCommand: string;
 }
 
 /** 設定画面で変えられる項目 */
@@ -76,7 +74,6 @@ export function loadConfig(): Config {
     ollamaHost: raw.ollamaHost ?? process.env.OLLAMA_HOST ?? 'http://127.0.0.1:11434',
     fallbackPatrolHours: raw.fallbackPatrolHours ?? 6,
     extraClaudeArgs: raw.extraClaudeArgs ?? [],
-    restartCommand: raw.restartCommand ?? 'npm run restart',
   };
 }
 
