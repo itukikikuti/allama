@@ -77,7 +77,7 @@ ollama signin              # Ollama のクラウドモデルを使うなら、�
 - Node.js はアプリに同梱のものを使う（本体は Node 24 で動く）。Claude Code も本体の依存として、win32 版の `claude.exe` ごと入る
 - Git for Windows と Ollama は入っていないと働かない所がある（Git が無いと Bash 道具、Ollama が無いと記憶の埋め込み）。手で入れるなら公式のインストーラ、winget なら `winget install Git.Git Ollama.Ollama` のあと `ollama pull qwen3-embedding:0.6b`
 - ログ：`%APPDATA%\allama\allama.log`、記憶：`%USERPROFILE%\.allama`
-- 窓は [desktop/](desktop/)。Windows の `.exe` を組むには Windows か wine が要るので、組むのは GitHub Actions の `windows` ワークフロー（`desktop/` で `npm run build`）
+- 窓は [desktop/](desktop/)。組むのは `desktop/` で `npm run build`（中身は [desktop/tools/build.mjs](desktop/tools/build.mjs) が決める）。**インストーラ（setup.exe）は本物の Windows でしか組めない**ので、配る物は GitHub Actions の `windows` ワークフローが組む。手元が Windows でなければ zip だけを組む（wine が無いと、中身の入っていない setup.exe が黙って出来るため）
 
 ### まとめて入れたいとき（PowerShell）
 

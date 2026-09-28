@@ -60,13 +60,10 @@ extraFiles:
   - from: ../LICENSE
     to: LICENSE
 
+# 組む物（nsis と zip）と、その選び方は tools/build.mjs が決める。
+# Windows 以外では zip だけを組む（wine が無いと、中身の入っていない setup.exe が黙って出来るため）。
 win:
   icon: build/icon.png
-  target:
-    - target: nsis
-      arch: [x64]
-    - target: zip
-      arch: [x64]
 
 # 入れる場所は人ごと（管理者不要）。config.json と node_modules を後から書ける場所に要る
 nsis:

@@ -12,7 +12,7 @@
     "icon": "node tools/make-icon.mjs",
     "node": "node tools/fetch-node.mjs",
     "notices": "node tools/make-notices.mjs",
-    "build": "npm run icon && npm run node && npm run notices && electron-builder --win --config electron-builder.yml"
+    "build": "node tools/build.mjs"
   },
   "devDependencies": {
     "electron": "^44.4.5",
