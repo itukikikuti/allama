@@ -43,6 +43,14 @@ extraResources:
     to: app/config.example.json
   - from: ../vendor/node
     to: node
+  # 同梱の npm。初回の npm ci に要る（install-deps.js と install.ps1 が使う）
+  #
+  # from を vendor/node/node_modules にしているのは、electron-builder が
+  # 「写す木の根の node_modules」を必ず外すため。vendor/node ごと写すと
+  # node_modules の中身（npm 本体と、その依存）が丸ごと落ちる。
+  # 根を node_modules の中にしてやると、相対が npm/... になるので残る。
+  - from: ../vendor/node/node_modules
+    to: node/node_modules
 
 win:
   icon: build/icon.png
