@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServerProcess, waitForServer } from './server-process.js';
+import { installDeps, missingDeps } from './install-deps.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -19,6 +20,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = app.isPackaged ? path.join(process.resourcesPath, 'app') : path.resolve(here, '..');
 /** 本体を動かす node。同梱のものを使う（Electron 自身の node ではない） */
 const nodeExe = app.isPackaged ? path.join(process.resourcesPath, 'node', 'node.exe') : process.env.ALLAMA_NODE || 'node';
+/** 同梱の npm。初回の依存入れ（npm ci）に使う */
+const npmCli = path.join(process.resourcesPath, 'node', 'node_modules', 'npm', 'bin', 'npm-cli.js');
 /** 窓のログ。本体の記録（~/.allama）とは別に置く */
 const logFile = path.join(app.getPath('userData'), 'allama.log');
 
@@ -41,15 +44,13 @@ function readConfig() {
   }
 }
 
-/** 初回に npm ci をしていないと動かないので、先に気づいて伝える */
-function checkBody() {
-  const need = ['hono', '@anthropic-ai/claude-agent-sdk', 'zod'];
-  const missing = need.filter((n) => !fs.existsSync(path.join(appRoot, 'node_modules', ...n.split('/'))));
-  if (missing.length) {
-    return `本体の依存がまだ入っていません（${missing.join('、')}）。\n\n${appRoot}\nで npm ci を実行してください（install.ps1 を使うと自動で入ります）。`;
+/** 窓の側の出来事も、本体と同じログに残す */
+function log(text) {
+  try {
+    fs.appendFileSync(logFile, text);
+  } catch {
+    // ログが書けなくても進む
   }
-  if (app.isPackaged && !fs.existsSync(nodeExe)) return `同梱の node が見つかりません: ${nodeExe}`;
-  return null;
 }
 
 function setStatus(text) {
@@ -140,12 +141,37 @@ async function fail(message) {
   }
 }
 
-async function boot() {
-  const problem = checkBody();
-  if (problem) {
-    await fail(problem);
-    return;
+/** 初回だけ、本体の依存を入れる（人が PowerShell や cmd を開かなくて済むように） */
+async function prepareBody() {
+  if (app.isPackaged && !fs.existsSync(nodeExe)) {
+    await fail(`同梱の node が見つかりません: ${nodeExe}`);
+    return false;
   }
+  if (!missingDeps(appRoot).length) return true;
+
+  log(`[allama] 本体の依存を入れる（${appRoot}）\n`);
+  const done = await installDeps({
+    appRoot,
+    nodeExe: app.isPackaged ? nodeExe : undefined,
+    npmCli: app.isPackaged ? npmCli : undefined,
+    onStatus: (line) => setStatus(`初回の準備をしています…（本体の依存を取ってきます。1GBほど、5〜10分）\n${line}`),
+    onLog: log,
+  });
+  if (!done.ok) {
+    await fail(`${done.message}\n\n手で入れるなら:\ncd ${appRoot}\nnpm ci\n\n（install.ps1 を使うと、これも自動で入ります）`);
+    return false;
+  }
+  const still = missingDeps(appRoot);
+  if (still.length) {
+    await fail(`依存を入れたのに見つかりません（${still.join('、')}）:\n${appRoot}`);
+    return false;
+  }
+  log('[allama] 依存が入った\n');
+  return true;
+}
+
+async function boot() {
+  if (!(await prepareBody())) return;
   const { port } = readConfig();
   url = `http://127.0.0.1:${port}/`;
 

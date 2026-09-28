@@ -65,18 +65,29 @@ ollama signin              # Ollama のクラウドモデルを使うなら、�
 
 ## 入れ方（Windows・管理者不要）
 
-```powershell
-git clone https://github.com/itukikikuti/allama.git $env:USERPROFILE\allama
-cd $env:USERPROFILE\allama
-.\deploy\install.ps1        # リリースの .exe を %LOCALAPPDATA%\allama に置き、初回の npm ci までやる
-```
+[リリース](https://github.com/itukikikuti/allama/releases/latest) から取ってくる。PowerShell は要らない。
+
+- **インストーラ**: `allama-<版>-win-x64-setup.exe` をダブルクリック
+- **持ち運びたいとき**: `allama-<版>-win-x64.zip` を書き込める場所に解凍して、`allama.exe` を叩く（インストール不要）
+
+どちらも**初回の起動で、本体の依存（1GBほど）を自分で取ってくる**。窓に「初回の準備をしています…」と出て、5〜10分かかる。2回目からはすぐ開く。
 
 - 画面は `allama.exe` の窓に出る。トレイに常駐し、閉じても裏で動き続ける（終了はトレイの「終了」から）
 - **Linux の systemd がやっていたことは、この窓がやる**：落ちたら起こし直す、`restart_self` の受け皿になる、すぐ落ちる失敗が続いたら間隔を空ける
 - Node.js はアプリに同梱のものを使う（本体は Node 24 で動く）。Claude Code も本体の依存として、win32 版の `claude.exe` ごと入る
-- Git for Windows と Ollama は winget で入れる（既にあればそのまま）。Git が無いと Bash 道具が使えず、Ollama が無いと記憶の埋め込みが働かない
+- Git for Windows と Ollama は入っていないと働かない所がある（Git が無いと Bash 道具、Ollama が無いと記憶の埋め込み）。手で入れるなら公式のインストーラ、winget なら `winget install Git.Git Ollama.Ollama` のあと `ollama pull qwen3-embedding:0.6b`
 - ログ：`%APPDATA%\allama\allama.log`、記憶：`%USERPROFILE%\.allama`
 - 窓は [desktop/](desktop/)。Windows の `.exe` を組むには Windows か wine が要るので、組むのは GitHub Actions の `windows` ワークフロー（`desktop/` で `npm run build`）
+
+### まとめて入れたいとき（PowerShell）
+
+`deploy/install.ps1` は、リリースの zip を `%LOCALAPPDATA%\allama` に置き、Git for Windows と Ollama を winget で入れ、依存も先に入れて、スタートメニューに登録する道具。窓が自分でやれるようになったので、もう必須ではない。
+
+```powershell
+git clone https://github.com/itukikikuti/allama.git $env:USERPROFILE\allama
+cd $env:USERPROFILE\allama
+.\deploy\install.ps1
+```
 
 ### 自分を改良させるには
 

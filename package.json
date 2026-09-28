@@ -1,6 +1,6 @@
 {
   "name": "allama",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Claude Code という手を使いこなす頭（AI秘書）",
   "type": "module",

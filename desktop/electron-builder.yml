@@ -1,8 +1,8 @@
 # Electron のアプリを Windows の .exe に組む設定。desktop/ で `npm run build` すると ../dist-desktop に出来る。
 #
 # 同梱するもの:
-#   resources/app  … allama の本体（server/ shared/ web/ package.json）。node_modules は初回に npm ci で入れる
-#   resources/node … 本体を動かす Node 24（win-x64）。Electron 自身の node は使わない
+#   resources/app  … allama の本体（server/ shared/ web/ package.json）。node_modules は初回の起動で窓が自分で入れる
+#   resources/node … 本体を動かす Node 24（win-x64）。Electron 自身の node は使わない。npm も入っているので初回の npm ci もこれで回す
 #
 # 秘書が自分の体を書き換えて再起動できるよう、本体は asar の外（extraResources）に置く。
 
@@ -17,6 +17,7 @@ directories:
 files:
   - main.js
   - server-process.js
+  - install-deps.js
   - loading.html
   - package.json
   - build/icon.png
