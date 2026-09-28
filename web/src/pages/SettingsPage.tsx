@@ -118,7 +118,7 @@ export function SettingsPage() {
                 onChange={(e) => update(r.key, { model: e.target.value })}
                 placeholder={r.kind === 'ollama' ? 'モデル名（例: deepseek-v4.1-flash:cloud）' : 'モデル（空なら既定。例: opus）'}
               />
-              <button type="button" disabled={r.kind !== 'ollama' || !r.model.trim()} onClick={() => check(`m${r.key}`, () => api.checkModel(toModel(r), host))}>
+              <button type="button" disabled={r.kind === 'ollama' && !r.model.trim()} onClick={() => check(`m${r.key}`, () => api.checkModel(toModel(r), host))}>
                 確かめる
               </button>
             </div>
