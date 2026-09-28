@@ -52,6 +52,17 @@ function disc(cx, cy, r, color) {
   }
 }
 
+/** 輪（顔の輪郭）。中心からの距離が半径±太さ半分のところを描く */
+function strokeRing(cx, cy, r, width, color) {
+  const outer = r + width / 2;
+  for (let y = Math.floor(cy - outer); y <= Math.ceil(cy + outer); y++) {
+    for (let x = Math.floor(cx - outer); x <= Math.ceil(cx + outer); x++) {
+      const d = Math.hypot(x - cx, y - cy);
+      if (Math.abs(d - r) <= width / 2) put(x, y, color);
+    }
+  }
+}
+
 /** 3次ベジェを太さで描く（口の曲線） */
 function strokeCurve(p0, p1, p2, p3, width, color) {
   const steps = 2000;
@@ -67,10 +78,11 @@ function strokeCurve(p0, p1, p2, p3, width, color) {
 const s = (v) => (v / 64) * N; // 64 の座標系から描画座標へ
 
 roundedRect(s(14));
+strokeRing(s(32), s(30), s(14), s(4), CREAM);
 disc(s(26.5), s(29), s(2.4), CREAM);
 disc(s(37.5), s(29), s(2.4), CREAM);
-strokeCurve([s(20), s(50)], [s(23), s(45)], [s(27.5), s(43)], [s(32), s(43)], s(4), CREAM);
-strokeCurve([s(32), s(43)], [s(36.5), s(43)], [s(41), s(45)], [s(44), s(50)], s(4), CREAM);
+strokeCurve([s(27.5), s(35)], [s(28.7), s(37.4)], [s(30.2), s(38.7)], [s(32), s(38.7)], s(4), CREAM);
+strokeCurve([s(32), s(38.7)], [s(33.8), s(38.7)], [s(35.3), s(37.4)], [s(36.5), s(35)], s(4), CREAM);
 
 /** 縮めて PNG にする */
 const out = Buffer.alloc(SIZE * SIZE * 4);
