@@ -1,6 +1,6 @@
 {
   "name": "allama-desktop",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "private": true,
   "description": "allama の窓（Electron）。本体は resources/app で動き、この窓が見張る",
   "author": "itukikikuti",
@@ -11,7 +11,8 @@
     "start": "electron .",
     "icon": "node tools/make-icon.mjs",
     "node": "node tools/fetch-node.mjs",
-    "build": "npm run icon && npm run node && electron-builder --win --config electron-builder.yml"
+    "notices": "node tools/make-notices.mjs",
+    "build": "npm run icon && npm run node && npm run notices && electron-builder --win --config electron-builder.yml"
   },
   "devDependencies": {
     "electron": "^44.4.5",

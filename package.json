@@ -1,8 +1,9 @@
 {
   "name": "allama",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "private": true,
   "description": "Claude Code という手を使いこなす頭（AI秘書）",
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=22.18"

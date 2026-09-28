@@ -117,6 +117,14 @@ npm run check     # 型チェック・画面のビルド・読み込みの確認
 
 サーバーは TypeScript をビルドせずに Node（22.18 以上）でそのまま動かしている。
 
+## ライセンス
+
+MIT（[LICENSE](LICENSE)）。
+
+配布物（Windows の .exe など）には third-party のコードが混ざっている。その著作権表示とライセンス文は [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) にまとめてある（`desktop/tools/make-notices.mjs` がビルドのたびに作る）。Electron・Chromium・Node.js・npm のライセンス文は、それぞれの配布物の中にそのまま入っている。
+
+本体の依存（hono、Claude Code など）は配布物には入っていない。初回の起動で npm から取ってくるので、ライセンス文もそのときについてくる。
+
 ## 以前の allama
 
 このリポジトリには、以前の allama（あなたとAIの仕事を1つのタスクリストに集める Windows 向けの仕事管理 CLI、v0.2.1）の履歴も残っている。

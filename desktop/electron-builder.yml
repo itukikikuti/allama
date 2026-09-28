@@ -52,6 +52,14 @@ extraResources:
   - from: ../vendor/node/node_modules
     to: node/node_modules
 
+# .exe の隣に置く（resources/ の中ではなく、allama.exe と同じ場所）
+# 同梱物に混ざる third-party の表示。desktop/tools/make-notices.mjs が作る
+extraFiles:
+  - from: ../THIRD-PARTY-NOTICES.txt
+    to: THIRD-PARTY-NOTICES.txt
+  - from: ../LICENSE
+    to: LICENSE
+
 win:
   icon: build/icon.png
   target:

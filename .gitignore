@@ -1,5 +1,7 @@
 node_modules/
 web/dist/
+# ビルドのついでに残す、画面に束ねられた package の記録（desktop/tools/make-notices.mjs が読む）
+web/.bundled-packages.json
 /config.json
 .dev-data/
 # Windows の .exe を組むときに作るもの（desktop/tools/fetch-node.mjs が持ってくる）
