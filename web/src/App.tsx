@@ -3,13 +3,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Route, Router, Switch, useLocation } from 'wouter';
 import { useHashLocation } from 'wouter/use-hash-location';
 import { Settings as SettingsIcon } from 'lucide-react';
+import type { RateLimits, UsageWindow } from '../../shared/types.ts';
 import { UnauthorizedError, api, connectEvents, onServerEvent, setToken } from './api.ts';
 import { MemoryPage } from './pages/MemoryPage.tsx';
 import { SessionView } from './pages/SessionView.tsx';
 import { SessionsPage } from './pages/SessionsPage.tsx';
 import { SettingsPage } from './pages/SettingsPage.tsx';
 import { TasksPage } from './pages/TasksPage.tsx';
-import { cx } from './util.ts';
+import { cx, dateTime } from './util.ts';
 
 /** 状態はサーバーからの知らせ（SSE）で更新し続ける */
 function useAppState() {
@@ -74,6 +75,7 @@ function Shell() {
             {tab('/sessions', location.startsWith('/sessions'), <>セッション{runningCount > 0 && <span className="badge live">{runningCount}</span>}</>)}
             {tab('/memory', location.startsWith('/memory'), <>記憶{state.memory.busy && <span className="badge live">…</span>}</>)}
           </nav>
+          {state.rateLimits && <UsageMeter r={state.rateLimits} />}
           <Link href="/settings" className={cx('icon-btn', location === '/settings' && 'active')} title="設定">
             <SettingsIcon size={17} />
           </Link>
@@ -96,6 +98,28 @@ function Shell() {
           </Route>
         </Switch>
       </main>
+    </div>
+  );
+}
+
+/** Claude の契約で使える量の残り。ターン中に届いた、最後に分かった値 */
+function UsageMeter({ r }: { r: RateLimits }) {
+  const win = (label: string, w?: UsageWindow) => {
+    if (!w) return null;
+    const pct = w.utilization;
+    const title = `${label}：${pct === null ? '分からない' : `${pct}% 使った`}${w.resetsAt ? `（${dateTime(w.resetsAt)} に戻る）` : ''}`;
+    return (
+      <span key={label} className={cx('usage-win', pct !== null && pct >= 90 && 'hot')} title={title}>
+        <span className="usage-label">{label}</span>
+        <span>{pct === null ? '—' : `${pct}%`}</span>
+      </span>
+    );
+  };
+  if (!r.fiveHour && !r.sevenDay) return null;
+  return (
+    <div className="usage" title={`Claude の使用制限${r.subscriptionType ? `（${r.subscriptionType}）` : ''}`}>
+      {win('5時間', r.fiveHour)}
+      {win('7日', r.sevenDay)}
     </div>
   );
 }

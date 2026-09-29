@@ -9,9 +9,10 @@ import {
   Loader2,
   MessageCircleQuestion,
 } from 'lucide-react';
-import type { AppState, SessionMeta, Task, TaskKind } from '../../../shared/types.ts';
+import { EFFORT_LEVELS, type AppState, type EffortLevel, type SessionMeta, type Task, type TaskKind } from '../../../shared/types.ts';
 import { api } from '../api.ts';
 import { AttachButton, AttachChips, useAttachments } from '../components/Attachments.tsx';
+import { EffortPicker } from '../components/EffortPicker.tsx';
 import { Markdown } from '../components/Markdown.tsx';
 import { ago, cx, dateTime, loadPref, savePref } from '../util.ts';
 
@@ -116,6 +117,10 @@ function Composer({ state }: { state: AppState }) {
     const saved = loadPref('model');
     return state.models.some((m) => m.id === saved) ? saved : state.defaultModelId;
   });
+  const [effort, setEffort] = useState<EffortLevel | null>(() => {
+    const saved = loadPref('effort');
+    return (EFFORT_LEVELS as readonly string[]).includes(saved ?? '') ? (saved as EffortLevel) : null;
+  });
   const [cwd, setCwd] = useState('');
   const [showCwd, setShowCwd] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -124,6 +129,7 @@ function Composer({ state }: { state: AppState }) {
   const up = useAttachments();
   const ref = useAutoGrow(text);
   const ready = Boolean(text.trim() || up.files.length);
+  const isClaude = state.models.find((m) => m.id === modelId)?.claude ?? false;
 
   const submit = async () => {
     if (!ready || busy || up.busy) return;
@@ -135,6 +141,7 @@ function Composer({ state }: { state: AppState }) {
         modelId,
         cwd: cwd.trim() || undefined,
         files: up.files.map((f) => f.path),
+        effort: isClaude ? effort ?? undefined : undefined,
       });
       setText('');
       up.clear();
@@ -179,6 +186,15 @@ function Composer({ state }: { state: AppState }) {
             </option>
           ))}
         </select>
+        {isClaude && (
+          <EffortPicker
+            value={effort ?? undefined}
+            onChange={(v) => {
+              setEffort(v);
+              savePref('effort', v ?? '');
+            }}
+          />
+        )}
         <button
           type="button"
           className={cx('icon-btn', showCwd && 'active')}

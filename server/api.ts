@@ -6,6 +6,7 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
+import { EFFORT_LEVELS, type EffortLevel } from '../shared/types.ts';
 import type { App } from './app.ts';
 import { APP_DIR, getSettings, saveSettings } from './config.ts';
 import { checkModel, checkOllama } from './providers.ts';
@@ -16,6 +17,10 @@ import { retention } from './memory/index.ts';
 import { embed, pull } from './memory/ollama.ts';
 
 const WEB_DIST = path.relative(process.cwd(), path.join(APP_DIR, 'web', 'dist')) || '.';
+
+/** 知らないエフォートは受け付けない */
+const asEffort = (v: unknown): EffortLevel | undefined =>
+  (EFFORT_LEVELS as readonly string[]).includes(String(v)) ? (v as EffortLevel) : undefined;
 
 export function startHttp(app: App): void {
   const api = new Hono();
@@ -64,6 +69,7 @@ export function startHttp(app: App): void {
         title: text ? undefined : `添付: ${attachmentNames(files)}`,
         modelId: b.modelId,
         cwd: b.cwd,
+        effort: asEffort(b.effort),
         trigger: 'user',
       }),
     );
@@ -93,6 +99,14 @@ export function startHttp(app: App): void {
   api.post('/sessions/:id/stop', (c) => {
     app.runner.stop(c.req.param('id'));
     return c.json({ ok: true });
+  });
+
+  // 考える量の切り替え。動いている最中でも変えられる（null で既定に戻す）
+  api.post('/sessions/:id/effort', async (c) => {
+    const b = await c.req.json();
+    const effort = b.effort === null ? null : asEffort(b.effort);
+    if (effort === undefined) throw new Error('知らないエフォート');
+    return c.json(app.runner.setEffort(c.req.param('id'), effort));
   });
 
   api.post('/tasks/:id/answer', async (c) => c.json(answerTask(app, c.req.param('id'), await c.req.json())));

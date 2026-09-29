@@ -3,6 +3,7 @@ import { ArrowUp, ChevronLeft, CircleAlert, Hand, Loader2, MessageCircleQuestion
 import type { AppState, ServerEvent, TurnData } from '../../../shared/types.ts';
 import { api, onServerEvent } from '../api.ts';
 import { AttachButton, AttachChips, useAttachments } from '../components/Attachments.tsx';
+import { EffortPicker } from '../components/EffortPicker.tsx';
 import { Transcript } from '../transcript/Transcript.tsx';
 import { dateTime, shortPath } from '../util.ts';
 
@@ -93,7 +94,9 @@ export function SessionView({ id, state }: { id: string; state: AppState }) {
   }
 
   const running = meta.status === 'running';
-  const model = state.models.find((m) => m.id === meta.modelId)?.label ?? meta.modelId;
+  const modelInfo = state.models.find((m) => m.id === meta.modelId);
+  const model = modelInfo?.label ?? meta.modelId;
+  const isClaude = modelInfo?.claude ?? false;
   const parent = meta.parentId ? state.sessions.find((s) => s.id === meta.parentId) : undefined;
   const waitingTasks = state.tasks.filter(
     (t) => t.sessionId === meta.id && t.status === 'open' && (t.kind === 'question' || t.kind === 'proposal'),
@@ -123,11 +126,14 @@ export function SessionView({ id, state }: { id: string; state: AppState }) {
             {dateTime(meta.createdAt)}
           </div>
         </div>
-        {running && (
-          <button type="button" className="stop-btn" onClick={stop}>
-            <Square size={12} /> 止める
-          </button>
-        )}
+        <div className="sh-actions">
+          {isClaude && <EffortPicker value={meta.effort} onChange={(v) => void api.setEffort(meta.id, v)} />}
+          {running && (
+            <button type="button" className="stop-btn" onClick={stop}>
+              <Square size={12} /> 止める
+            </button>
+          )}
+        </div>
       </div>
 
       {parent && (

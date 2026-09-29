@@ -38,10 +38,11 @@ export class App {
       sessions,
       tasks: [...store.tasks.filter((t) => t.status === 'open'), ...closed],
       wakeups: [...store.wakeups].sort((a, b) => a.at.localeCompare(b.at)),
-      models: config.models.map(({ id, label }) => ({ id, label })),
+      models: config.models.map(({ id, label, claude }) => ({ id, label, claude: claude !== undefined })),
       defaultModelId: config.defaultModelId,
       defaultCwd: config.defaultCwd,
       memory: this.memory.status(),
+      rateLimits: store.rateLimits,
     };
   }
 

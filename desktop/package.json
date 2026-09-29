@@ -1,6 +1,6 @@
 {
   "name": "allama-desktop",
-  "version": "0.3.5",
+  "version": "0.4.0",
   "private": true,
   "description": "allama の窓（Electron）。本体は resources/app で動き、この窓が見張る",
   "author": "itukikikuti",

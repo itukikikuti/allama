@@ -3,8 +3,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { query } from '@anthropic-ai/claude-agent-sdk';
-import type { InputSource, SessionMeta, SessionStatus, Trigger, TurnInput } from '../shared/types.ts';
+import { query, type Query } from '@anthropic-ai/claude-agent-sdk';
+import type { EffortLevel, InputSource, SessionMeta, SessionStatus, Trigger, TurnInput } from '../shared/types.ts';
 import type { App } from './app.ts';
 import { ollamaEnv } from './config.ts';
 import { buildSystemPrompt } from './head.ts';
@@ -55,6 +55,8 @@ export interface CreateSessionOptions {
   cwd?: string;
   title?: string;
   parentId?: string;
+  /** Claude のモデルのときだけ効く */
+  effort?: EffortLevel;
 }
 
 function mergeInputs(inputs: TurnInput[]): TurnInput {
@@ -66,6 +68,8 @@ function mergeInputs(inputs: TurnInput[]): TurnInput {
 export class Runner {
   app: App;
   private active = new Map<string, AbortController>();
+  /** 動いているターンの Claude Code。エフォートの切り替えなど、途中で指示を送るのに使う */
+  private live = new Map<string, Query>();
   private restartReason: string | null = null;
 
   constructor(app: App) {
@@ -95,12 +99,15 @@ export class Runner {
     const modelId = config.models.some((m) => m.id === opts.modelId) ? opts.modelId! : config.defaultModelId;
     const cwd = opts.cwd?.trim() ? path.resolve(opts.cwd.trim()) : config.defaultCwd;
     if (!fs.existsSync(cwd)) throw new Error(`作業フォルダが存在しない: ${cwd}`);
+    // エフォートは Claude のモデルのときだけ持たせる
+    const isClaude = config.models.find((m) => m.id === modelId)?.claude !== undefined;
     const now = nowIso();
     const meta = store.addSession({
       id: newId(),
       title: opts.title?.trim() || firstLine(opts.message, 40) || '（無題）',
       modelId,
       cwd,
+      effort: isClaude ? opts.effort : undefined,
       trigger: opts.trigger,
       parentId: opts.parentId,
       createdAt: now,
@@ -130,6 +137,16 @@ export class Runner {
   stop(sessionId: string): void {
     this.app.store.updateSession(sessionId, { queue: [] });
     this.active.get(sessionId)?.abort();
+  }
+
+  /** 考える量を変える。動いている最中なら、そのターンの途中から切り替える（次のターンにも持ち越す） */
+  setEffort(sessionId: string, effort: EffortLevel | null): SessionMeta {
+    const { store } = this.app;
+    const s = store.session(sessionId);
+    if (!s) throw new Error(`セッションが見つからない: ${sessionId}`);
+    const updated = store.updateSession(s.id, { effort: effort ?? undefined }, false);
+    void this.live.get(s.id)?.applyFlagSettings({ effortLevel: effort }).catch(() => {});
+    return updated;
   }
 
   /** 動いているセッションが全部区切りに来たら再起動する（systemd が起こし直す） */
@@ -165,6 +182,8 @@ export class Runner {
     const { config, store, memory } = this.app;
     const f = (kind: Parameters<typeof turnFile>[3]) => turnFile(config.dataDir, meta.id, turn, kind);
     const model = config.models.find((m) => m.id === meta.modelId) ?? config.models[0];
+    // ターンの途中で変えられているかもしれないので、いまの値を引き直す
+    const effort = store.session(meta.id)?.effort;
     let result: any;
     let lastRetry: any;
     let error: string | undefined;
@@ -180,6 +199,8 @@ export class Runner {
         options: {
           cwd: meta.cwd,
           model: model.ollama ?? (model.claude || undefined),
+          // 考える量。Claude のモデルのときだけ渡す（Ollama には意味が無い）
+          ...(model.claude !== undefined && effort ? { effort } : {}),
           ...(turn === 1 ? { sessionId: meta.id } : { resume: meta.id }),
           systemPrompt: { type: 'preset', preset: 'claude_code', append: system },
           mcpServers: { allama: createTools(this.app, meta.id) },
@@ -197,11 +218,14 @@ export class Runner {
           stderr: (d) => fs.appendFileSync(f('err.txt'), d),
         },
       });
+      this.live.set(meta.id, q);
       for await (const msg of q) {
         const ev = msg as any;
         // 「考え中のトークン数」は大量に出るので、画面に流すだけで残さない
         if (!(ev.type === 'system' && ev.subtype === 'thinking_tokens')) fs.writeSync(out, `${JSON.stringify(ev)}\n`);
         if (ev.type === 'result') result = ev;
+        // Claude の契約で使える量の残りが届いたら、覚えておく
+        if (ev.type === 'rate_limit_event') store.setRateLimit(ev.rate_limit_info ?? {});
         if (ev.type === 'system' && ev.subtype === 'api_retry') lastRetry = ev;
         if (ev.type === 'system' && ev.subtype === 'post_turn_summary' && ev.status_detail) {
           store.updateSession(meta.id, { summary: String(ev.status_detail) }, false);
@@ -213,6 +237,7 @@ export class Runner {
     } finally {
       fs.closeSync(out);
       this.active.delete(meta.id);
+      this.live.delete(meta.id);
     }
 
     let status: SessionStatus = 'idle';

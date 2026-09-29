@@ -1,6 +1,7 @@
 import type {
   AppState,
   CheckResult,
+  EffortLevel,
   MemoryItem,
   MemoryLog,
   ModelSetting,
@@ -50,8 +51,9 @@ export async function uploadFile(file: File): Promise<UploadedFile> {
 export const api = {
   state: () => req<AppState>('GET', '/api/state'),
   transcript: (id: string) => req<{ session: SessionMeta; turns: TurnData[] }>('GET', `/api/sessions/${id}/transcript`),
-  startSession: (b: { message: string; modelId?: string; cwd?: string; files?: string[] }) =>
+  startSession: (b: { message: string; modelId?: string; cwd?: string; files?: string[]; effort?: EffortLevel }) =>
     req<SessionMeta>('POST', '/api/sessions', b),
+  setEffort: (id: string, effort: EffortLevel | null) => req<SessionMeta>('POST', `/api/sessions/${id}/effort`, { effort }),
   answer: (taskId: string, b: { action?: string; text?: string; files?: string[] }) =>
     req<Task>('POST', `/api/tasks/${taskId}/answer`, b),
   stop: (id: string) => req<{ ok: boolean }>('POST', `/api/sessions/${id}/stop`),

@@ -2,6 +2,17 @@
 
 export type SessionStatus = 'running' | 'idle' | 'error';
 
+/** Claude が考える量（推論エフォート）。Claude のモデルのときだけ使える */
+export const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
+export type EffortLevel = (typeof EFFORT_LEVELS)[number];
+export const EFFORT_LABEL: Record<EffortLevel, string> = {
+  low: '低い',
+  medium: '普通',
+  high: '高い',
+  xhigh: 'とても高い',
+  max: '最大',
+};
+
 /** セッションを始めたきっかけ */
 export type Trigger = 'user' | 'wakeup' | 'session';
 
@@ -19,6 +30,8 @@ export interface SessionMeta {
   status: SessionStatus;
   /** 直近のターンの一言要約（Claude Code の post_turn_summary） */
   summary?: string;
+  /** 考える量（Claude のモデルのときだけ）。未設定なら Claude Code の既定 */
+  effort?: EffortLevel;
   /** 開始したターン数 */
   turns: number;
   /** 実行中に届いたメッセージ。ターンが終わったら渡す */
@@ -86,6 +99,28 @@ export interface UploadedFile {
 export interface ModelOption {
   id: string;
   label: string;
+  /** Claude（Anthropic）のモデルか。Ollama のモデルでは エフォートは使えない */
+  claude: boolean;
+}
+
+/** 使用制限の1つの窓（5時間・7日など） */
+export interface UsageWindow {
+  /** 使った割合（0〜100）。分からないときは null */
+  utilization: number | null;
+  /** リセットされる時刻 */
+  resetsAt?: string;
+}
+
+/** Claude の契約（サブスク）で使える量の残り。APIキーやOllamaでは分からない */
+export interface RateLimits {
+  /** 'pro' | 'max' | 'team' | 'enterprise' など */
+  subscriptionType?: string | null;
+  /** allowed / allowed_warning / rejected */
+  status?: string;
+  fiveHour?: UsageWindow;
+  sevenDay?: UsageWindow;
+  /** いつ時点の値か（ターン中に届いたもの） */
+  updatedAt: string;
 }
 
 export interface AppState {
@@ -96,6 +131,8 @@ export interface AppState {
   defaultModelId: string;
   defaultCwd: string;
   memory: MemoryStatus;
+  /** 分かっているときだけ入る */
+  rateLimits?: RateLimits;
 }
 
 export type ServerEvent =
