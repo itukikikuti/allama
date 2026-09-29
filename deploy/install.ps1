@@ -114,9 +114,12 @@ try {
   Pop-Location
 }
 
-# --- 設定（無いときだけ見本から作る） ---
-$config = Join-Path $appDir 'config.json'
-if (-not (Test-Path $config)) {
+# --- 設定（無いときだけ見本から作る）。置き場所は記憶と同じ %USERPROFILE%\.allama ---
+# 本体のフォルダに古い config.json があれば、本体が起動時にそこへ移すので、ここでは作らない
+$config = Join-Path $env:USERPROFILE '.allama\config.json'
+$legacyConfig = Join-Path $appDir 'config.json'
+if (-not (Test-Path $config) -and -not (Test-Path $legacyConfig)) {
+  New-Item -ItemType Directory -Force (Split-Path $config) | Out-Null
   Copy-Item (Join-Path $appDir 'config.example.json') $config
   Write-Host '  設定を作った（既定は 127.0.0.1:3170）'
 }

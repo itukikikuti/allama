@@ -55,7 +55,27 @@ function expandHome(p: string): string {
   return p === '~' || p.startsWith('~/') ? path.join(os.homedir(), p.slice(1)) : p;
 }
 
-const configFile = (): string => process.env.ALLAMA_CONFIG ?? path.join(APP_DIR, 'config.json');
+/** 設定の置き場所。版のフォルダの外（記憶と同じ ~/.allama）に置く。新しい版に入れ替えても残るように */
+export const defaultConfigFile = (): string => path.join(os.homedir(), '.allama', 'config.json');
+
+const configFile = (): string => process.env.ALLAMA_CONFIG ?? defaultConfigFile();
+
+/** 以前の場所（本体のフォルダ）の config.json を、新しい場所へ移す。場所を人に決められているとき（ALLAMA_CONFIG）は触らない */
+function migrateConfigFile(): void {
+  if (process.env.ALLAMA_CONFIG) return;
+  const file = defaultConfigFile();
+  if (fs.existsSync(file)) return;
+  const legacy = path.join(APP_DIR, 'config.json');
+  if (!fs.existsSync(legacy)) return;
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.copyFileSync(legacy, file);
+    fs.unlinkSync(legacy);
+    console.log(`[allama] 設定を ${file} へ移した`);
+  } catch (e: any) {
+    console.log(`[allama] 設定を移せなかった（${legacy}）: ${e.message}`);
+  }
+}
 
 function readRaw(): any {
   const file = configFile();
@@ -70,6 +90,7 @@ function migrateModel(m: any): any {
 }
 
 export function loadConfig(): Config {
+  migrateConfigFile();
   const raw = readRaw();
   const models = (raw.models?.length ? raw.models : [{ id: 'claude', label: 'Claude', claude: '' }]).map(migrateModel);
   const firstOllama = models.find((m: ModelConfig) => m.ollama)?.ollama ?? 'deepseek-v4.1-flash:cloud';

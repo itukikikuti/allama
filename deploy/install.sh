@@ -40,7 +40,11 @@ say "allama"
 cd "$APP_DIR"
 npm ci
 npm run build
-[ -f config.json ] || cp config.example.json config.json
+# 設定は記憶と同じ ~/.allama に置く（本体のフォルダに古い config.json があれば、本体がそこへ移す）
+mkdir -p "$HOME/.allama"
+if [ ! -f "$HOME/.allama/config.json" ] && [ ! -f config.json ]; then
+  cp config.example.json "$HOME/.allama/config.json"
+fi
 # 秘書が自分でコミットするときの名前（未設定のときだけ）
 git config user.name >/dev/null || git config user.name allama
 git config user.email >/dev/null || git config user.email allama@localhost

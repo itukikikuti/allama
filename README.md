@@ -77,7 +77,7 @@ ollama signin              # Ollama のクラウドモデルを使うなら、�
 - **Linux の systemd がやっていたことは、この窓がやる**：落ちたら起こし直す、`restart_self` の受け皿になる、すぐ落ちる失敗が続いたら間隔を空ける
 - Node.js はアプリに同梱のものを使う（本体は Node 24 で動く）。Claude Code も本体の依存として、win32 版の `claude.exe` ごと入る
 - Git for Windows と Ollama は入っていないと働かない所がある（Git が無いと Bash 道具、Ollama が無いと記憶の埋め込み）。手で入れるなら公式のインストーラ、winget なら `winget install Git.Git Ollama.Ollama` のあと `ollama pull qwen3-embedding:0.6b`
-- ログ：`%APPDATA%\allama\allama.log`、記憶：`%USERPROFILE%\.allama`
+- ログ：`%APPDATA%\allama\allama.log`、記憶と設定：`%USERPROFILE%\.allama`（`config.json` もここ。だから新しい版に入れ替えても、モデルの設定は残る）
 - 窓は [desktop/](desktop/)。組むのは `desktop/` で `npm run build`（中身は [desktop/tools/build.mjs](desktop/tools/build.mjs) が決める）。**インストーラ（setup.exe）は本物の Windows でしか組めない**ので、配る物は GitHub Actions の `windows` ワークフローが組む。手元が Windows でなければ zip だけを組む（wine が無いと、中身の入っていない setup.exe が黙って出来るため）
 
 ### まとめて入れたいとき（PowerShell）
@@ -95,6 +95,8 @@ cd $env:USERPROFILE\allama
 セッションは `~/allama` のソースを書き換え、`restart_self` で反映する。型チェック・画面のビルド・読み込みの確認が通ったときだけ、動いているセッションが区切りに来たところで再起動する。人が手で反映するときは `npm run restart`。
 
 ## 設定（config.json）
+
+置き場所は `~/.allama/config.json`（記憶と同じ所。版のフォルダの外なので、入れ替えても残る）。環境変数 `ALLAMA_CONFIG` で別の場所を指せる。以前の版の `config.json`（本体のフォルダ）があれば、起動時に新しい場所へ移す。
 
 画面から変えられないもの：
 

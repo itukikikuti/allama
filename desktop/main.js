@@ -9,6 +9,7 @@
 
 import { app, BrowserWindow, Menu, Tray, dialog, nativeImage, shell } from 'electron';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServerProcess, waitForServer } from './server-process.js';
@@ -31,11 +32,35 @@ let server = null;
 let quitting = false;
 let url = 'http://127.0.0.1:3170/';
 
-/** config.json が無ければ見本から作る。窓は port だけ知ればよい */
+/** 設定の置き場所。記憶と同じ ~/.allama に置く。新しい版に入れ替えても残るように（本体の server/config.ts と同じ決め方） */
+const configFile = () => path.join(os.homedir(), '.allama', 'config.json');
+
+/**
+ * 設定を読み、無ければ作る。窓は port だけ知ればよい。
+ * 前の版のフォルダに config.json があれば、それを新しい場所へ移す（設定を失わないように）
+ */
 function readConfig() {
-  const file = path.join(appRoot, 'config.json');
+  const file = configFile();
+  const legacy = path.join(appRoot, 'config.json');
   const example = path.join(appRoot, 'config.example.json');
-  if (!fs.existsSync(file) && fs.existsSync(example)) fs.copyFileSync(example, file);
+  if (!fs.existsSync(file)) {
+    try {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      if (fs.existsSync(legacy)) {
+        fs.copyFileSync(legacy, file);
+        log(`[allama] 設定を ${file} へ移した（${legacy} から）\n`);
+        try {
+          fs.unlinkSync(legacy); // 移した後は要らない
+        } catch {
+          // 消せなくても進む（読む先はもう新しい場所）
+        }
+      } else if (fs.existsSync(example)) {
+        fs.copyFileSync(example, file);
+      }
+    } catch (e) {
+      log(`[allama] 設定を用意できなかった: ${e.message}\n`);
+    }
+  }
   try {
     const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
     return { port: Number(raw.port) || 3170 };

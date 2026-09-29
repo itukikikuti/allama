@@ -20,6 +20,7 @@ allama.exe                      … Electron の窓。トレイに常駐する
 
 - 窓を閉じても裏で動き続ける（終了はトレイの「終了」から）。トレイから `Windows にサインインしたら開く` を切り替えられる
 - 本体は asar の外（`resources/app`）に置く。秘書が自分の体を書き換えて `restart_self` できるようにするため
+- **設定（`config.json`）は記憶と同じ `%USERPROFILE%\.allama` に置く**。版のフォルダの中に置くと、新しい版の zip を別のフォルダに解いたときに設定（モデルなど）が既定に戻ってしまうため。前の版のフォルダに `resources\app\config.json` があれば、窓が起動時にそこへ移す（本体側 `server/config.ts` も同じ移行をする）
 
 ## 初回の準備（`install-deps.js`）
 
